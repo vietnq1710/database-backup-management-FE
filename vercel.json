@@ -2,7 +2,7 @@
     "rewrites": [
         {
             "source": "/api/(.*)",
-            "destination": "http://https://backup-management.onrender.com/$1"
+            "destination": "https://backup-management.onrender.com/api/$1"
         },
         {
             "source": "/((?!assets/).*)",
