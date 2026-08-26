@@ -361,6 +361,17 @@ export function useUpdateDatabaseConfig(id: string) {
   });
 }
 
+export function useDeleteDatabaseConfig() {
+  const invalidateAll = useInvalidateAll();
+  return useMutation({
+    mutationFn: (id: string) =>
+      request<unknown>(endpoints.databaseConfigs.remove(id), {
+        method: "DELETE",
+      }),
+    onSuccess: invalidateAll,
+  });
+}
+
 export function useDatabases(serverId: string | null) {
   return useQuery({
     queryKey: serverId !== null ? KEYS.databases(serverId) : ["servers", "databases"],

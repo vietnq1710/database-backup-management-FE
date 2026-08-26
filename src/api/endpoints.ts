@@ -15,6 +15,7 @@ export const endpoints = {
     list: "/database-config/many",
     create: "/database-config",
     update: (id: string) => `/database-config/${id}`,
+    remove: (id: string) => `/database-config/${id}`,
   },
   inspector: {
     databases: (serverId: string) =>

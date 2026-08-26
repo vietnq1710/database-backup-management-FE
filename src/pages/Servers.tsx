@@ -6,6 +6,7 @@ import {
   useDeleteDatabaseServer,
   useCreateDatabaseConfig,
   useDatabaseConfigs,
+  useDeleteDatabaseConfig,
   useDatabases,
   useServers,
   useUpdateDatabaseConfig,
@@ -621,6 +622,7 @@ function ServersContent() {
   const servers = useServers();
   const configs = useDatabaseConfigs();
   const remove = useDeleteDatabaseServer();
+  const removeConfig = useDeleteDatabaseConfig();
   const [dialog, setDialog] = useState<
     { kind: "create" } | { kind: "edit"; server: Server } | null
   >(null);
@@ -636,6 +638,14 @@ function ServersContent() {
     if (!confirm(`Xóa server "${s.name}"?`)) return;
     remove.mutate(s.id, {
       onSuccess: () => toast.success(`Đã xóa server ${s.name}`),
+      onError: (e) => toast.error(e.message),
+    });
+  };
+
+  const onRemoveConfig = (id: string, code: string) => {
+    if (!confirm(`Xóa config "${code}"?`)) return;
+    removeConfig.mutate(id, {
+      onSuccess: () => toast.success(`Đã xóa config ${code}`),
       onError: (e) => toast.error(e.message),
     });
   };
@@ -805,20 +815,29 @@ function ServersContent() {
                         {c.username ?? "—"}
                       </td>
                       <td className={tdCls}>
-                        <button
-                          title="Sửa"
-                          className="border border-[var(--panel-mid)] p-1.5 text-[var(--text-muted)] transition-colors hover:border-[var(--accent-blue)] hover:text-white"
-                          onClick={() =>
-                            setConfigDialog({
-                              kind: "edit",
-                              id: c.id,
-                              code: c.configCode ?? "",
-                              username: c.username ?? "",
-                            })
-                          }
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex gap-1.5">
+                          <button
+                            title="Sửa"
+                            className="border border-[var(--panel-mid)] p-1.5 text-[var(--text-muted)] transition-colors hover:border-[var(--accent-blue)] hover:text-white"
+                            onClick={() =>
+                              setConfigDialog({
+                                kind: "edit",
+                                id: c.id,
+                                code: c.configCode ?? "",
+                                username: c.username ?? "",
+                              })
+                            }
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            title="Xóa"
+                            className="border border-[var(--panel-mid)] p-1.5 text-[var(--text-muted)] transition-colors hover:border-[var(--accent-red)] hover:text-white"
+                            onClick={() => onRemoveConfig(c.id, c.configCode ?? shortId(c.id))}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
