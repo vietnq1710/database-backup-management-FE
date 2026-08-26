@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Calm-space theme tokens (blue) */
+    --panel-dark: #0F2535;
+    --panel-mid: #1F4A65;
+    --panel-light: #A7C9DE;
+    --text-muted: #6B87A0;
+    --accent-blue: #4C9BE0;
+    --accent-green: #4CC38A;
+    --accent-red: #E05C5C;
+    --accent-yellow: #E6AF2E;
+
+    --background: 222 80% 20%;
+    --foreground: 0 0% 100%;
+    --card: 222 80% 20%;
+    --card-foreground: 0 0% 100%;
+    --popover: 210 55% 12%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 222 80% 20%;
+    --secondary: 222 60% 25%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 222 60% 25%;
+    --muted-foreground: 222 50% 60%;
+    --accent: 207 70% 59%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 52% 26%;
+    --input: 210 52% 26%;
+    --ring: 207 70% 59%;
+    --radius: 0px;
+
+    /* shadcn sidebar tokens mapped to calm-space palette */
+    --sidebar-background: 210 55% 11%;
+    --sidebar-foreground: 204 38% 82%;
+    --sidebar-primary: 207 70% 59%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 52% 18%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 210 52% 20%;
+    --sidebar-ring: 207 70% 59%;
+
+    /* Native controls (select popup, scrollbar, date picker...) theo theme tối */
+    color-scheme: dark;
+  }
+
+  * { @apply border-border; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    background: var(--panel-dark);
+    color: #fff;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--panel-dark); }
+  ::-webkit-scrollbar-thumb { background: var(--panel-mid); border: 2px solid var(--panel-dark); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
+
+  /* Dropdown native (select) nền tối, chữ sáng — không còn popup trắng chói */
+  select option,
+  select optgroup {
+    background-color: #0b1c29;
+    color: #dcebf5;
+  }
+  select option:checked,
+  select option:hover {
+    background-color: var(--panel-mid);
+    color: #fff;
+  }
+}
+
+@layer components {
+  .panel {
+    background: color-mix(in srgb, var(--panel-dark) 82%, black);
+    border: 1px solid var(--panel-mid);
+  }
+  .panel-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .mono-nums {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-3px); }
+  20% { transform: translateX(3px); }
+  30% { transform: translateX(-2px); }
+  40% { transform: translateX(2px); }
+  50% { transform: translateX(-1px); }
+  60% { transform: translateX(1px); }
+}
+
+.shake-animation {
+  animation: shake 0.5s ease-in-out;
+}

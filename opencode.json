@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "ollama-local/qwen2.5-coder:7b",
+  "providers": {
+    "ollama-local": {
+      "api_base": "http://localhost:11434/v1",
+      "apiKey": "ollama"
+    }
+  }
+}
