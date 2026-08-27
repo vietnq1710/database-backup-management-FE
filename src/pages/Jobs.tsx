@@ -27,6 +27,7 @@ import {
 import { toast } from "sonner";
 import { useSearchParams } from "react-router";
 import type { BackupJob } from "@/types/api";
+import { useNotifications } from "@/components/NotificationProvider";
 
 const inputCls =
   "w-full border border-[var(--panel-mid)] bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-[var(--accent-blue)] placeholder:text-[var(--text-muted)]";
@@ -94,6 +95,7 @@ function BackupJobDialog({
   const [error, setError] = useState<string | null>(null);
   const createBackup = useCreateBackupJob();
   const updateBackup = useUpdateBackupJob();
+  const { addNotification } = useNotifications();
   const pending = createBackup.isPending || updateBackup.isPending;
 
   const submit = (e: FormEvent) => {
@@ -118,6 +120,7 @@ function BackupJobDialog({
     const opts = {
       onSuccess: () => {
         toast.success(editing ? "Đã cập nhật backup job" : "Đã tạo backup job");
+        addNotification(editing ? "Đã cập nhật backup job" : "Đã tạo backup job mới");
         onClose();
       },
       onError: (err: Error) => setError(err.message),
@@ -243,6 +246,7 @@ function SyncJobDialog({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const createSync = useCreateSyncJob();
+  const { addNotification } = useNotifications();
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -257,6 +261,7 @@ function SyncJobDialog({ onClose }: { onClose: () => void }) {
       {
         onSuccess: () => {
           toast.success("Đã tạo sync job");
+          addNotification("Đã tạo sync job mới, đang chờ xử lý...");
           onClose();
         },
         onError: (err) => setError(err.message),
@@ -391,6 +396,7 @@ function JobsContent() {
 
   const toggle = useToggleJob();
   const remove = useRemoveJob();
+  const { addNotification } = useNotifications();
   const busy = toggle.isPending || remove.isPending;
 
   const onToggleBackup = (job: BackupJob) => {
@@ -402,8 +408,11 @@ function JobsContent() {
         current: job,
       },
       {
-        onSuccess: () =>
-          toast.success(!job.isActive ? "Đã kích hoạt job" : "Đã tạm dừng job"),
+        onSuccess: () => {
+          const msg = !job.isActive ? "Đã kích hoạt job" : "Đã tạm dừng job";
+          toast.success(msg);
+          addNotification(msg);
+        },
         onError: (e) => toast.error(e.message),
       },
     );
@@ -414,7 +423,10 @@ function JobsContent() {
     remove.mutate(
       { kind, id },
       {
-        onSuccess: () => toast.success("Đã xóa job"),
+        onSuccess: () => {
+          toast.success("Đã xóa job");
+          addNotification(`Đã xóa job "${name}"`);
+        },
         onError: (e) => toast.error(e.message),
       },
     );

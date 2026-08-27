@@ -4,14 +4,11 @@
 export const endpoints = {
   servers: {
     list: "/database-server/many",
-    // create/update/delete theo base controller của BE (POST "", PUT/:id, DELETE/:id)
     create: "/database-server",
     update: (id: string) => `/database-server/${id}`,
     remove: (id: string) => `/database-server/${id}`,
   },
   databaseConfigs: {
-    // Route đoán theo convention của BE (backup-job/many, sync-job/many...) —
-    // nếu 404 thì cần user gửi controller database-config để đối chiếu
     list: "/database-config/many",
     create: "/database-config",
     update: (id: string) => `/database-config/${id}`,
@@ -46,7 +43,6 @@ export const endpoints = {
     remove: (id: string) => `/user-permission/${id}`,
   },
   users: {
-    // Route đoán theo convention (/xxx/many) — nếu 404 cần controller user để đối chiếu
     list: "/user/many",
   },
   history: {

@@ -11,7 +11,7 @@ export interface User {
 }
 
 // BE trả "postgres" | "mongo"
-export type DbType = "postgres" | "mysql" | "mongo" | "redis";
+export type DbType = "postgres" | "mongo";
 export type ServerStatus = "online" | "offline" | "degraded";
 
 // ── Enum thật của BE (22/08/2026) ────────────────────────────────
@@ -112,7 +112,9 @@ export interface BackupJobWithServer {
   job: BackupJob;
 }
 
-export function jobStatusOf(job: Pick<BackupJob, "isActive">): "active" | "paused" {
+export function jobStatusOf(
+  job: Pick<BackupJob, "isActive">
+): "active" | "paused" {
   return job.isActive ? "active" : "paused";
 }
 
@@ -242,9 +244,7 @@ export interface HistoryFilter {
 
 // Giá trị thật của enum PermissionResourceType bên BE
 export type PermissionResourceType =
-  | "database-server"
-  | "database-config"
-  | "global";
+  "database-server" | "database-config" | "global";
 
 // Item của GET /user-permission/many
 export interface UserPermission {
@@ -281,4 +281,3 @@ export interface CreateUserPermissionPayload {
 export interface UpdateUserPermissionPayload {
   permissions?: string[];
 }
-

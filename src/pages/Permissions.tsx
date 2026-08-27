@@ -27,6 +27,7 @@ import type {
 } from "@/types/api";
 import { Loader2, Pencil, Plus, ShieldOff, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useNotifications } from "@/components/NotificationProvider";
 
 const inputCls =
   "w-full border border-[var(--panel-mid)] bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-[var(--accent-blue)] placeholder:text-[var(--text-muted)]";
@@ -138,6 +139,7 @@ function CreatePermissionDialog({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const create = useCreateUserPermission();
+  const { addNotification } = useNotifications();
 
   const toggle = (action: string) =>
     setSelected((prev) =>
@@ -164,6 +166,7 @@ function CreatePermissionDialog({ onClose }: { onClose: () => void }) {
       {
         onSuccess: () => {
           toast.success("Đã gán quyền cho user");
+          addNotification("Đã gán quyền mới cho user");
           onClose();
         },
         onError: (err) => setError(err.message),
@@ -308,6 +311,7 @@ function EditPermissionDialog({
 
   const [selected, setSelected] = useState<string[]>(perm.permissions);
   const [error, setError] = useState<string | null>(null);
+  const { addNotification } = useNotifications();
 
   // --- quyền liên quan trên cùng tài nguyên ---
   const relatedConfigs =
@@ -381,6 +385,7 @@ function EditPermissionDialog({
         });
       }
       toast.success("Đã cập nhật quyền");
+      addNotification(`Đã cập nhật quyền cho user`);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
@@ -468,6 +473,7 @@ function AdminPermissions() {
   const servers = useServers();
   const configs = useDatabaseConfigs();
   const remove = useDeleteUserPermission();
+  const { addNotification } = useNotifications();
 
   const [dialog, setDialog] = useState<
     | { kind: "create" }
@@ -494,7 +500,10 @@ function AdminPermissions() {
     const u = userById.get(p.userId);
     if (!confirm(`Xóa quyền "${userLabel(u) || shortId(p.userId)}"?`)) return;
     remove.mutate(p.id, {
-      onSuccess: () => toast.success("Đã xóa quyền"),
+      onSuccess: () => {
+        toast.success("Đã xóa quyền");
+        addNotification(`Đã xóa quyền của user "${userLabel(u) || shortId(p.userId)}"`);
+      },
       onError: (e) => toast.error(e.message),
     });
   };

@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { request, requestFile } from "@/lib/api-client";
 import { endpoints } from "@/api/endpoints";
 import { shortId } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 import type {
   BackupJob,
   BackupJobWithServer,
@@ -841,4 +842,115 @@ export function useHistoryRuns(filter: HistoryFilter) {
 
 export function downloadRunFile(id: string, fallbackName?: string) {
   return requestFile(endpoints.history.download(id), fallbackName);
+}
+
+// ── Completion notifications ────────────────────────────────────
+// Theo dõi polling data từ sync jobs & backup history, phát hiện
+// khi một job hoàn thành rồi bắn toast + bell notification.
+//
+// Case 1 (sync): job chuyển từ PENDING/RUNNING → SUCCESS/FAILED
+// Case 2 (backup): job mới xuất tại FE đã là success/failed
+//   (BE chạy xong mới tạo history record → FE không thấy "running")
+
+function syncLabel(j: SyncJob) {
+  const label = (c?: DatabaseConfigRef | null) =>
+    c ? c.configCode ?? shortId(c.id) : "?";
+  return `${label(j.sourceDatabaseConfig)} → ${label(j.targetDatabaseConfig)}`;
+}
+
+const KEYSNotifications = {
+  backupRuns: ["notifications", "backup-runs"] as const,
+};
+
+export function useCompletionNotifications(
+  addNotification: (text: string) => void,
+) {
+  const seenSyncRef = useRef(new Map<string, string>());
+  const seenBackupRef = useRef(new Map<string, string>());
+  const initSyncRef = useRef(false);
+  const initBackupRef = useRef(false);
+
+  const syncs = useSyncJobs();
+
+  const backupRuns = useQuery({
+    queryKey: KEYSNotifications.backupRuns,
+    queryFn: async () =>
+      unwrapMany<Record<string, unknown>>(
+        await request(endpoints.history.list),
+      ).map(mapBackupRun),
+    refetchInterval: (query) =>
+      query.state.data?.some((r) => r.status === "running") ? 3000 : 20000,
+  });
+
+  // ── Sync completions ──
+  useEffect(() => {
+    const jobs = syncs.data;
+    if (!jobs) return;
+    const seen = seenSyncRef.current;
+
+    if (!initSyncRef.current) {
+      for (const j of jobs) {
+        if (j.id && j.status) seen.set(j.id, j.status);
+      }
+      initSyncRef.current = true;
+      return;
+    }
+
+    for (const j of jobs) {
+      if (!j.id || !j.status) continue;
+      const isCompleted = j.status === "SUCCESS" || j.status === "FAILED";
+      if (!isCompleted) {
+        seen.set(j.id, j.status);
+        continue;
+      }
+      const old = seen.get(j.id);
+      const wasCompleted = old === "SUCCESS" || old === "FAILED";
+      if (old === undefined || !wasCompleted) {
+        const label = syncLabel(j);
+        if (j.status === "SUCCESS") {
+          toast.success(`Sync hoàn thành: ${label}`);
+          addNotification(`Sync hoàn thành: ${label}`);
+        } else {
+          toast.error(`Sync thất bại: ${label}`);
+          addNotification(`Sync thất bại: ${label}`);
+        }
+      }
+      seen.set(j.id, j.status);
+    }
+  }, [syncs.data, addNotification]);
+
+  // ── Backup completions ──
+  useEffect(() => {
+    const runs = backupRuns.data;
+    if (!runs) return;
+    const seen = seenBackupRef.current;
+
+    if (!initBackupRef.current) {
+      for (const r of runs) {
+        if (r.id) seen.set(r.id, r.status);
+      }
+      initBackupRef.current = true;
+      return;
+    }
+
+    for (const r of runs) {
+      if (!r.id || !r.status) continue;
+      const isCompleted = r.status === "success" || r.status === "failed";
+      if (!isCompleted) {
+        seen.set(r.id, r.status);
+        continue;
+      }
+      if (!seen.has(r.id)) {
+        const label = r.databaseName ?? r.jobName ?? shortId(r.id);
+        if (r.status === "success") {
+          toast.success(`Backup hoàn thành: ${label}`);
+          addNotification(`Backup hoàn thành: ${label}`);
+        } else {
+          toast.error(`Backup thất bại: ${label}`);
+          addNotification(`Backup thất bại: ${label}`);
+        }
+      }
+      seen.set(r.id, r.status);
+    }
+  }, [backupRuns.data, addNotification]);
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import AuthLayout from "@/components/AuthLayout";
 import { PageHeader, Panel, StatusBadge, EmptyState, TableStateRow } from "@/components/common";
@@ -33,6 +33,7 @@ import {
   Server,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNotifications } from "@/components/NotificationProvider";
 import {
   Area,
   AreaChart,
@@ -86,7 +87,8 @@ function StorageChart() {
   const series = useStorageSeries();
   const current = useStorageCurrent();
   const { data } = series;
-  const [gran, setGran] = useState<ChartGranularity>("half");
+  const [gran, setGran] = useState<ChartGranularity>("day");
+  const scrollRef = useRef<HTMLDivElement>(null);
   // Gom snapshot theo mốc thời gian (giờ / 12h / ngày), lấy giá trị mới nhất trong mỗi mốc
   const chartData = useMemo(() => {
     const bucketMs = GRANULARITY_MS[gran];
@@ -111,6 +113,13 @@ function StorageChart() {
         used: b.used,
       }));
   }, [data, gran]);
+
+  useEffect(() => {
+    if (scrollRef.current && chartData.length > 0) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }
+  }, [chartData.length]);
+
   const latest = data?.at(-1) ?? current.data ?? null;
   const latestTotal = latest
     ? (latest.payloadSize ?? 0) + (latest.metadataSize ?? 0)
@@ -152,7 +161,7 @@ function StorageChart() {
       className="lg:col-span-2"
     >
       <div className="p-5">
-        <div className="h-64 overflow-x-auto pb-1">
+        <div ref={scrollRef} className="h-64 overflow-x-auto pb-1">
           {series.isError ? (
             <EmptyState
               icon={Cloud}
@@ -357,6 +366,7 @@ function DatabaseInspector() {
 
   const rescanServer = useRescanServer();
   const rescanTables = useRescanTables();
+  const { addNotification } = useNotifications();
 
   const selectedServer = servers.data?.find((s) => s.id === effectiveServerId);
 
@@ -364,17 +374,23 @@ function DatabaseInspector() {
     if (!effectiveServerId) return;
     rescanServer.mutate(effectiveServerId, {
       onSuccess: async () => {
+        const serverName = selectedServer?.name ?? effectiveServerId;
         toast.info("Đã gửi yêu cầu quét lại server, đang chờ kết quả...");
+        addNotification(`Đã gửi yêu cầu quét lại "${serverName}", đang chờ...`);
         const res = await pollScanResult(
           databases.refetch,
           databases.data?.scannedAt ?? null,
         );
         if (!res?.data) {
           toast.error("Quét server chưa xong sau 30s — thử tải lại sau.");
+          addNotification(`Quét server "${serverName}" chưa xong sau 30s`);
         } else if (res.data.status === "FAILED") {
-          toast.error(`Quét server lỗi: ${res.data.errorMessage ?? "không rõ"}`);
+          const errMsg = res.data.errorMessage ?? "không rõ";
+          toast.error(`Quét server lỗi: ${errMsg}`);
+          addNotification(`Quét server "${serverName}" lỗi: ${errMsg}`);
         } else {
-          toast.success(`Đã quét xong databases của "${selectedServer?.name ?? effectiveServerId}"`);
+          toast.success(`Đã quét xong databases của "${serverName}"`);
+          addNotification(`Đã quét xong databases của "${serverName}"`);
         }
       },
       onError: (e) => toast.error(`Gửi yêu cầu quét thất bại: ${e.message}`),
@@ -388,16 +404,21 @@ function DatabaseInspector() {
       {
         onSuccess: async () => {
           toast.info(`Đã gửi yêu cầu quét lại "${effectiveDb}", đang chờ...`);
+          addNotification(`Đã gửi yêu cầu quét lại "${effectiveDb}", đang chờ...`);
           const res = await pollScanResult(
             tables.refetch,
             tables.data?.scannedAt ?? null,
           );
           if (!res?.data) {
             toast.error("Quét tables chưa xong sau 30s — thử tải lại sau.");
+            addNotification(`Quét tables "${effectiveDb}" chưa xong sau 30s`);
           } else if (res.data.status === "FAILED") {
-            toast.error(`Quét tables lỗi: ${res.data.errorMessage ?? "không rõ"}`);
+            const errMsg = res.data.errorMessage ?? "không rõ";
+            toast.error(`Quét tables lỗi: ${errMsg}`);
+            addNotification(`Quét tables "${effectiveDb}" lỗi: ${errMsg}`);
           } else {
             toast.success(`Đã quét xong tables của "${effectiveDb}"`);
+            addNotification(`Đã quét xong tables của "${effectiveDb}"`);
           }
         },
         onError: (e) => toast.error(`Gửi yêu cầu quét thất bại: ${e.message}`),

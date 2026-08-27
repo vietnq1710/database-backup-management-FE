@@ -20,6 +20,7 @@ import type {
 } from "@/types/api";
 import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useNotifications } from "@/components/NotificationProvider";
 
 const inputCls =
   "w-full border border-[var(--panel-mid)] bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-[var(--accent-blue)] placeholder:text-[var(--text-muted)]";
@@ -100,6 +101,7 @@ function CreateServerDialog({ onClose }: { onClose: () => void }) {
   const [connectionOptions, setConnectionOptions] = useState("");
   const [error, setError] = useState<string | null>(null);
   const create = useCreateDatabaseServer();
+  const { addNotification } = useNotifications();
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -120,6 +122,7 @@ function CreateServerDialog({ onClose }: { onClose: () => void }) {
       {
         onSuccess: () => {
           toast.success("Đã tạo database server");
+          addNotification(`Đã tạo server "${serverName.trim()}"`);
           onClose();
         },
         onError: (err) => setError(err.message),
@@ -265,6 +268,7 @@ function EditServerDialog({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const update = useUpdateDatabaseServer();
+  const { addNotification } = useNotifications();
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -286,6 +290,7 @@ function EditServerDialog({
       {
         onSuccess: () => {
           toast.success("Đã cập nhật server");
+          addNotification(`Đã cập nhật server "${serverName.trim()}"`);
           onClose();
         },
         onError: (err) => setError(err.message),
@@ -405,6 +410,7 @@ function CreateConfigDialog({ onClose }: { onClose: () => void }) {
   const [databaseName, setDatabaseName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const create = useCreateDatabaseConfig();
+  const { addNotification } = useNotifications();
   // danh sách database trên server đã chọn — chọn thay vì nhập tay
   const databases = useDatabases(serverId || null);
   const dbOptions = databases.data?.items ?? [];
@@ -424,6 +430,7 @@ function CreateConfigDialog({ onClose }: { onClose: () => void }) {
       {
         onSuccess: () => {
           toast.success("Đã tạo database config");
+          addNotification(`Đã tạo config "${configCode.trim()}"`);
           onClose();
         },
         onError: (err) => setError(err.message),
@@ -549,6 +556,7 @@ function EditConfigDialog({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const update = useUpdateDatabaseConfig(id);
+  const { addNotification } = useNotifications();
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -565,6 +573,7 @@ function EditConfigDialog({
     update.mutate(payload, {
       onSuccess: () => {
         toast.success("Đã cập nhật config");
+        addNotification(`Đã cập nhật config "${configCode.trim()}"`);
         onClose();
       },
       onError: (err) => setError(err.message),
@@ -623,6 +632,7 @@ function ServersContent() {
   const configs = useDatabaseConfigs();
   const remove = useDeleteDatabaseServer();
   const removeConfig = useDeleteDatabaseConfig();
+  const { addNotification } = useNotifications();
   const [dialog, setDialog] = useState<
     { kind: "create" } | { kind: "edit"; server: Server } | null
   >(null);
@@ -637,7 +647,10 @@ function ServersContent() {
   const onRemove = (s: Server) => {
     if (!confirm(`Xóa server "${s.name}"?`)) return;
     remove.mutate(s.id, {
-      onSuccess: () => toast.success(`Đã xóa server ${s.name}`),
+      onSuccess: () => {
+        toast.success(`Đã xóa server ${s.name}`);
+        addNotification(`Đã xóa server "${s.name}"`);
+      },
       onError: (e) => toast.error(e.message),
     });
   };
@@ -645,7 +658,10 @@ function ServersContent() {
   const onRemoveConfig = (id: string, code: string) => {
     if (!confirm(`Xóa config "${code}"?`)) return;
     removeConfig.mutate(id, {
-      onSuccess: () => toast.success(`Đã xóa config ${code}`),
+      onSuccess: () => {
+        toast.success(`Đã xóa config ${code}`);
+        addNotification(`Đã xóa config "${code}"`);
+      },
       onError: (e) => toast.error(e.message),
     });
   };

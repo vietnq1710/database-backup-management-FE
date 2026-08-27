@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router";
 import { Toaster } from "sonner";
+import { PageTransition } from "./components/PageTransition";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
@@ -24,16 +25,18 @@ export default function App() {
           },
         }}
       />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/callback" element={<AuthCallback />} />
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/jobs" element={<Jobs />} />
-        <Route path="/history" element={<History />} />
-        <Route path="/servers" element={<Servers />} />
-        <Route path="/permissions" element={<Permissions />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <PageTransition>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/callback" element={<AuthCallback />} />
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/jobs" element={<Jobs />} />
+          <Route path="/history" element={<History />} />
+          <Route path="/servers" element={<Servers />} />
+          <Route path="/permissions" element={<Permissions />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </PageTransition>
     </>
   );
 }

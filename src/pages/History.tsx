@@ -6,6 +6,7 @@ import { formatBytes, formatDateTime, formatDuration, shortId } from "@/lib/form
 import type { BackupRun } from "@/types/api";
 import { Download, FileText, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useNotifications } from "@/components/NotificationProvider";
 
 type Run = BackupRun;
 
@@ -45,6 +46,7 @@ function HistoryContent() {
   const [status, setStatus] = useState<"all" | "success" | "failed" | "running">("all");
   const [logRun, setLogRun] = useState<Run | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const { addNotification } = useNotifications();
 
   const runs = useHistoryRuns({ kind, status });
   // backup-history chỉ có backupJobId — join tên job phía FE;
@@ -78,6 +80,7 @@ function HistoryContent() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success(`Đã tải ${fileName}`);
+      addNotification(`Đã tải ${fileName}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Không tải được file");
     } finally {
