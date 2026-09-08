@@ -46,6 +46,10 @@ export function shortId(id: string | null | undefined): string {
   return id ? `${id.slice(0, 8)}…` : "—";
 }
 
+export function totalPagesOf(total: number, limit: number): number {
+  return Math.max(1, Math.ceil(total / limit));
+}
+
 export function cronLabel(cron: string): string {
   const map: Record<string, string> = {
     "* * * * *": "Mỗi phút",

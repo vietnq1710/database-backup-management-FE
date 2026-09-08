@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Inbox } from "lucide-react";
+import { Inbox, LayoutGrid, LayoutList } from "lucide-react";
 
 export function StatusBadge({ status }: { status?: string | null }) {
   const styles: Record<string, { dot: string; text: string; label: string }> = {
@@ -19,8 +19,8 @@ export function StatusBadge({ status }: { status?: string | null }) {
   if (!s)
     s =
       status == null
-        ? { dot: "bg-white/40", text: "text-white/60", label: "—" }
-        : { dot: "bg-white", text: "text-white", label: String(status).toUpperCase() };
+        ? { dot: "bg-[var(--foreground)]/40", text: "text-[var(--foreground)]/60", label: "—" }
+        : { dot: "bg-[var(--foreground)]", text: "text-[var(--foreground)]", label: String(status).toUpperCase() };
   return (
     <span className={`inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.15em] ${s.text}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
@@ -53,11 +53,53 @@ export function Panel({
   );
 }
 
-export function PageHeader({ title, sub }: { title: string; sub?: string }) {
+export function ViewToggle({
+  value,
+  onChange,
+}: {
+  value: "table" | "grid";
+  onChange: (v: "table" | "grid") => void;
+}) {
   return (
-    <div className="mb-6">
-      <h1 className="text-2xl font-black tracking-tight uppercase">{title}</h1>
-      {sub && <p className="mt-1 text-sm text-[var(--text-muted)]">{sub}</p>}
+    <div className="relative inline-grid grid-cols-2 border border-[var(--panel-mid)]">
+      <span
+        className={
+          "absolute inset-y-0 left-0 w-1/2 bg-[var(--accent-blue)] transition-transform duration-200 " +
+          (value === "grid" ? "translate-x-full" : "translate-x-0")
+        }
+      />
+      {(
+        [
+          { key: "table", icon: LayoutList },
+          { key: "grid", icon: LayoutGrid },
+        ] as const
+      ).map((v) => (
+        <button
+          key={v.key}
+          type="button"
+          onClick={() => onChange(v.key)}
+          className={
+            "relative z-10 flex items-center gap-1.5 px-3 py-1.5 transition-colors " +
+            (value === v.key
+              ? "text-white"
+              : "text-[var(--text-muted)] hover:text-[var(--foreground)]")
+          }
+        >
+          <v.icon className="h-3.5 w-3.5" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function PageHeader({ title, sub, right }: { title: string; sub?: string; right?: ReactNode }) {
+  return (
+    <div className="mb-6 flex items-center justify-between gap-4">
+      <div>
+        <h1 className="text-2xl font-black tracking-tight uppercase">{title}</h1>
+        {sub && <p className="mt-1 text-sm text-[var(--text-muted)]">{sub}</p>}
+      </div>
+      {right}
     </div>
   );
 }

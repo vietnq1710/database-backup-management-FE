@@ -1,27 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
 import AuthLayout from "@/components/AuthLayout";
-import { PageHeader, Panel, StatusBadge, EmptyState, TableStateRow } from "@/components/common";
+import { PageHeader, Panel, EmptyState } from "@/components/common";
 import {
-  useBackupJobs,
-  useBackupJobLabels,
-  useDatabases,
+  useConfigSnapshot,
+  useDatabaseConfigs,
   useDashboardOverview,
-  useRescanServer,
-  useRescanTables,
-  useServers,
+  useHistoryRuns,
+  useProjects,
+  useRescanConfig,
   useStorageCurrent,
   useStorageSeries,
-  useSyncJobs,
-  useTables,
 } from "@/api/hooks";
 import {
-  cronLabel,
   formatBytes,
-  formatDateTime,
-  formatDuration,
   formatNumber,
-  shortId,
 } from "@/lib/format";
 import {
   Activity,
@@ -37,7 +29,10 @@ import { useNotifications } from "@/components/NotificationProvider";
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -148,8 +143,8 @@ function StorageChart() {
                 onClick={() => setGran(value)}
                 className={`px-2 py-1 text-[10px] font-bold tracking-[0.15em] uppercase transition-colors ${
                   gran === value
-                    ? "bg-[var(--accent-blue)] text-white"
-                    : "text-[var(--text-muted)] hover:text-white"
+                    ? "bg-[var(--accent-blue)] text-[var(--foreground)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--foreground)]"
                 }`}
               >
                 {label}
@@ -232,103 +227,6 @@ function StorageChart() {
   );
 }
 
-function JobsOverview() {
-  const backups = useBackupJobs();
-  const syncs = useSyncJobs();
-  const navigate = useNavigate();
-
-  const activeCount = (backups.data ?? []).filter((r) => r.job.isActive).length;
-
-  const registered = [
-    ...(backups.data ?? []).map((r) => ({
-      key: `b-${r.job.id}`,
-      name: r.job.id,
-      server: r.job.databaseConfigId
-        ? `config ${shortId(r.job.databaseConfigId)}`
-        : "—",
-      schedule: r.job.cronExpression,
-      status: r.job.isActive ? "active" : "paused",
-      kind: "BACKUP",
-    })),
-    ...(syncs.data ?? []).map((j) => ({
-      key: `s-${j.id}`,
-      name: j.id,
-      server:
-        j.sourceDatabaseConfig?.databaseName || j.targetDatabaseConfig
-          ? `${j.sourceDatabaseConfig?.configCode ?? "?"}/${j.sourceDatabaseConfig?.databaseName ?? "?"} → ${j.targetDatabaseConfig?.configCode ?? "?"}/${j.targetDatabaseConfig?.databaseName ?? "?"}`
-          : "—",
-      schedule: null,
-      status: j.status,
-      kind: "SYNC",
-    })),
-  ];
-
-  return (
-    <Panel
-      title={`Registered Jobs — ${registered.length}`}
-      right={
-        <span className="inline-flex items-center gap-2 text-[10px] font-bold tracking-[0.15em] text-[var(--accent-blue)]">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent-blue)]" />
-          {activeCount} ACTIVE
-        </span>
-      }
-      className="lg:col-span-3"
-    >
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--panel-mid)] text-left">
-              <th className="panel-label px-5 py-3 font-extrabold">Job</th>
-              <th className="panel-label px-5 py-3 font-extrabold">Loại</th>
-              <th className="panel-label px-5 py-3 font-extrabold">Database Config</th>
-              <th className="panel-label px-5 py-3 font-extrabold">Trạng thái</th>
-              <th className="panel-label px-5 py-3 font-extrabold">Lịch chạy</th>
-            </tr>
-          </thead>
-          <tbody>
-            {registered.map((j) => (
-              <tr
-                key={j.key}
-                onClick={() =>
-                  navigate(j.kind === "BACKUP" ? "/jobs?tab=backup" : "/jobs?tab=sync")
-                }
-                className="cursor-pointer border-b border-[var(--panel-mid)]/50 last:border-0 hover:bg-[var(--panel-mid)]/20"
-              >
-                <td className="px-5 py-3 font-semibold">{j.name}</td>
-                <td className="px-5 py-3">
-                  <span
-                    className={`mono-nums border px-1.5 py-0.5 text-[10px] ${
-                      j.kind === "BACKUP"
-                        ? "border-[var(--accent-blue)]/50 text-[var(--accent-blue)]"
-                        : "border-[var(--accent-red)]/50 text-[var(--accent-red)]"
-                    }`}
-                  >
-                    {j.kind}
-                  </span>
-                </td>
-                <td className="mono-nums px-5 py-3 text-xs text-[var(--text-muted)]">{j.server}</td>
-                <td className="px-5 py-3">
-                  <StatusBadge status={j.status} />
-                </td>
-                <td className="mono-nums px-5 py-3 text-xs text-[var(--panel-light)]">
-                  {j.schedule ? cronLabel(j.schedule) : "—"}
-                </td>
-              </tr>
-            ))}
-            {registered.length === 0 && (
-              <TableStateRow
-                colSpan={5}
-                loading={backups.isLoading || syncs.isLoading}
-                empty="Chưa có job nào được đăng ký"
-              />
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Panel>
-  );
-}
-
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -355,188 +253,181 @@ async function pollScanResult(
 }
 
 function DatabaseInspector() {
-  const servers = useServers();
-  const [serverId, setServerId] = useState<string | null>(null);
-  const [dbName, setDbName] = useState<string | null>(null);
+  const projects = useProjects();
+  const configs = useDatabaseConfigs();
+  const [configId, setConfigId] = useState<string | null>(null);
 
-  const effectiveServerId = serverId ?? servers.data?.[0]?.id ?? null;
-  const databases = useDatabases(effectiveServerId);
-  const effectiveDb = dbName ?? databases.data?.items[0]?.databaseName ?? null;
-  const tables = useTables(effectiveServerId, effectiveDb);
-
-  const rescanServer = useRescanServer();
-  const rescanTables = useRescanTables();
+  // snapshot theo config: mỗi database-config = 1 database cố định
+  const effectiveConfigId = configId ?? configs.data?.[0]?.id ?? null;
+  const snapshot = useConfigSnapshot(effectiveConfigId);
+  const rescan = useRescanConfig();
   const { addNotification } = useNotifications();
 
-  const selectedServer = servers.data?.find((s) => s.id === effectiveServerId);
+  const selectedConfig = configs.data?.find((c) => c.id === effectiveConfigId);
+  const selectedProjectId = selectedConfig?.projectId ?? null;
+  const cfgProject = projects.data?.find((p) => p.id === selectedProjectId);
 
-  const handleRescanServer = () => {
-    if (!effectiveServerId) return;
-    rescanServer.mutate(effectiveServerId, {
+  const handleRescan = () => {
+    if (!effectiveConfigId) return;
+    const label = `${selectedConfig?.databaseName ?? "?"} (${selectedConfig?.configCode ?? effectiveConfigId})`;
+    rescan.mutate(effectiveConfigId, {
       onSuccess: async () => {
-        const serverName = selectedServer?.name ?? effectiveServerId;
-        toast.info("Đã gửi yêu cầu quét lại server, đang chờ kết quả...");
-        addNotification(`Đã gửi yêu cầu quét lại "${serverName}", đang chờ...`);
+        toast.info("Đã gửi yêu cầu quét lại config, đang chờ kết quả...");
+        addNotification(`Đã gửi yêu cầu quét lại "${label}", đang chờ...`);
         const res = await pollScanResult(
-          databases.refetch,
-          databases.data?.scannedAt ?? null,
+          snapshot.refetch,
+          snapshot.data?.scannedAt ?? null,
         );
         if (!res?.data) {
-          toast.error("Quét server chưa xong sau 30s — thử tải lại sau.");
-          addNotification(`Quét server "${serverName}" chưa xong sau 30s`);
+          toast.error("Quét config chưa xong sau 30s — thử tải lại sau.");
+          addNotification(`Quét config "${label}" chưa xong sau 30s`);
         } else if (res.data.status === "FAILED") {
           const errMsg = res.data.errorMessage ?? "không rõ";
-          toast.error(`Quét server lỗi: ${errMsg}`);
-          addNotification(`Quét server "${serverName}" lỗi: ${errMsg}`);
+          toast.error(`Quét config lỗi: ${errMsg}`);
+          addNotification(`Quét config "${label}" lỗi: ${errMsg}`);
         } else {
-          toast.success(`Đã quét xong databases của "${serverName}"`);
-          addNotification(`Đã quét xong databases của "${serverName}"`);
+          toast.success(`Đã quét xong tables của "${label}"`);
+          addNotification(`Đã quét xong tables của "${label}"`);
         }
       },
       onError: (e) => toast.error(`Gửi yêu cầu quét thất bại: ${e.message}`),
     });
   };
 
-  const handleRescanTables = () => {
-    if (!effectiveServerId || !effectiveDb) return;
-    rescanTables.mutate(
-      { serverId: effectiveServerId, databaseName: effectiveDb },
-      {
-        onSuccess: async () => {
-          toast.info(`Đã gửi yêu cầu quét lại "${effectiveDb}", đang chờ...`);
-          addNotification(`Đã gửi yêu cầu quét lại "${effectiveDb}", đang chờ...`);
-          const res = await pollScanResult(
-            tables.refetch,
-            tables.data?.scannedAt ?? null,
-          );
-          if (!res?.data) {
-            toast.error("Quét tables chưa xong sau 30s — thử tải lại sau.");
-            addNotification(`Quét tables "${effectiveDb}" chưa xong sau 30s`);
-          } else if (res.data.status === "FAILED") {
-            const errMsg = res.data.errorMessage ?? "không rõ";
-            toast.error(`Quét tables lỗi: ${errMsg}`);
-            addNotification(`Quét tables "${effectiveDb}" lỗi: ${errMsg}`);
-          } else {
-            toast.success(`Đã quét xong tables của "${effectiveDb}"`);
-            addNotification(`Đã quét xong tables của "${effectiveDb}"`);
-          }
-        },
-        onError: (e) => toast.error(`Gửi yêu cầu quét thất bại: ${e.message}`),
-      },
-    );
-  };
-
   return (
     <Panel
       title="Database Inspector"
       right={
-        selectedServer && (
+        selectedConfig && (
           <span className="mono-nums text-[10px] text-[var(--text-muted)]">
-            {selectedServer.host} · {selectedServer.type.toUpperCase()}
+            {selectedConfig.host ?? "—"} · {(selectedConfig.databaseType ?? "?").toUpperCase()}
           </span>
         )
       }
       className="lg:col-span-3"
     >
       <div className="grid md:grid-cols-3">
-        {/* servers */}
+        {/* projects */}
         <div className="border-b border-[var(--panel-mid)] md:border-b-0 md:border-r">
-          <div className="panel-label px-4 py-3">Servers được cấp quyền</div>
-          {(servers.data ?? []).map((s) => (
-            <button
-              key={s.id}
-              onClick={() => {
-                setServerId(s.id);
-                setDbName(null);
-              }}
-              className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors ${
-                s.id === effectiveServerId
-                  ? "bg-[var(--panel-mid)]/40 text-white"
-                  : "text-[var(--panel-light)] hover:bg-[var(--panel-mid)]/20"
-              }`}
-            >
-              <span className="flex items-center gap-2">
+          <div className="panel-label px-4 py-3">Projects được cấp quyền</div>
+          {(projects.data ?? []).map((p) => (
+            <div key={p.id} className="mb-1">
+              <div className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[var(--panel-light)]">
                 <Server className="h-3.5 w-3.5 text-[var(--accent-blue)]" />
-                {s.name}
-              </span>
-              <StatusBadge status={s.status} />
-            </button>
+                {p.name}
+              </div>
+              {(configs.data ?? [])
+                .filter((c) => c.projectId === p.id)
+                .map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setConfigId(c.id)}
+                    className={`flex w-full items-center justify-between py-1.5 pl-9 pr-4 text-left text-xs transition-colors ${
+                      c.id === effectiveConfigId
+                        ? "bg-[var(--panel-mid)]/40 text-[var(--foreground)]"
+                        : "text-[var(--panel-light)] hover:bg-[var(--panel-mid)]/20"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Database className="h-3 w-3 text-[var(--accent-blue)]" />
+                      {c.databaseName ?? "?"}
+                    </span>
+                    <span className="mono-nums text-[9px] text-[var(--text-muted)]">
+                      {c.configCode ? c.configCode : ""}
+                    </span>
+                  </button>
+                ))}
+            </div>
           ))}
-          {servers.data?.length === 0 && (
+          {projects.data?.length === 0 && (
             <p className="px-4 py-4 text-xs text-[var(--text-muted)]">
-              Tài khoản chưa được cấp quyền server nào.
+              Tài khoản chưa được cấp quyền project nào.
             </p>
           )}
         </div>
 
-        {/* databases */}
+        {/* config info */}
         <div className="border-b border-[var(--panel-mid)] md:border-b-0 md:border-r">
-          <div className="panel-label flex items-center justify-between px-4 py-3">
-            Databases
-            <button
-              onClick={handleRescanServer}
-              disabled={!effectiveServerId || rescanServer.isPending}
-              title="Quét lại databases của server này"
-              className="p-1 text-[var(--text-muted)] transition-colors hover:text-white disabled:opacity-40"
-            >
-              <RefreshCw
-                className={`h-3 w-3 ${rescanServer.isPending ? "animate-spin" : ""}`}
-              />
-            </button>
-          </div>
-          {(databases.data?.items ?? []).map((d) => (
-            <button
-              key={d.databaseName}
-              onClick={() => setDbName(d.databaseName)}
-              className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors ${
-                d.databaseName === effectiveDb
-                  ? "bg-[var(--panel-mid)]/40 text-white"
-                  : "text-[var(--panel-light)] hover:bg-[var(--panel-mid)]/20"
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Database className="h-3.5 w-3.5 text-[var(--accent-blue)]" />
-                {d.databaseName}
-              </span>
-              <span className="mono-nums text-[10px] text-[var(--text-muted)]">
-                {d.totalBytes != null ? formatBytes(d.totalBytes) : "—"}
-              </span>
-            </button>
-          ))}
-          {(databases.isLoading || databases.data?.items.length === 0) && (
+          <div className="panel-label px-4 py-3">Config</div>
+          {selectedConfig ? (
+            <div className="space-y-2 px-4 py-2 text-xs">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                  Config code
+                </div>
+                <div className="mono-nums">{selectedConfig.configCode ?? "—"}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                  Project
+                </div>
+                <div>{cfgProject?.name ?? selectedProjectId ?? "—"}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                  Database
+                </div>
+                <div className="mono-nums">{selectedConfig.databaseName ?? "—"}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                  Host
+                </div>
+                <div className="mono-nums">
+                  {selectedConfig.host ?? "—"}
+                  {selectedConfig.port ? `:${selectedConfig.port}` : ""}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                  User
+                </div>
+                <div className="mono-nums">{selectedConfig.username ?? "—"}</div>
+              </div>
+              {snapshot.data?.scannedAt && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                    Quét gần nhất
+                  </div>
+                  <div className="mono-nums">{snapshot.data.scannedAt}</div>
+                </div>
+              )}
+              {snapshot.data?.status === "FAILED" && (
+                <p className="border border-[var(--accent-red)]/40 bg-[var(--accent-red)]/10 px-2 py-1.5 text-[var(--accent-red)]">
+                  Quét lỗi: {snapshot.data.errorMessage ?? "không rõ nguyên nhân"}
+                </p>
+              )}
+            </div>
+          ) : (
             <p className="px-4 py-4 text-xs text-[var(--text-muted)]">
-              {databases.isLoading
-                ? "Đang tải databases..."
-                : databases.data && !databases.data.scannedAt
-                  ? "Server chưa có bản quét nào — bấm nút ↻ để quét."
-                  : "Không lấy được database nào từ server này."}
-            </p>
-          )}
-          {databases.data?.status === "FAILED" && (
-            <p className="px-4 py-4 text-xs text-[var(--accent-red)]">
-              Quét lỗi: {databases.data.errorMessage ?? "không rõ nguyên nhân"}
+              Chưa có database config nào.
             </p>
           )}
         </div>
 
-        {/* tables */}
+        {/* snapshot tables */}
         <div className="max-h-[70vh] overflow-y-auto">
           <div className="panel-label sticky top-0 z-10 flex items-center justify-between bg-[var(--panel-dark)] px-4 py-3">
-            <span>Tables {effectiveDb ? `— ${effectiveDb}` : ""}</span>
+            <span>
+              Tables{" "}
+              {selectedConfig?.databaseName
+                ? `— ${selectedConfig.databaseName}`
+                : ""}
+            </span>
             <button
-              onClick={handleRescanTables}
-              disabled={!effectiveServerId || !effectiveDb || rescanTables.isPending}
-              title={`Quét lại tables của "${effectiveDb ?? ""}"`}
-              className="p-1 text-[var(--text-muted)] transition-colors hover:text-white disabled:opacity-40"
+              onClick={handleRescan}
+              disabled={!effectiveConfigId || rescan.isPending}
+              title={`Quét lại snapshot của "${selectedConfig?.databaseName ?? ""}"`}
+              className="p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)] disabled:opacity-40"
             >
               <RefreshCw
-                className={`h-3 w-3 ${rescanTables.isPending ? "animate-spin" : ""}`}
+                className={`h-3 w-3 ${rescan.isPending ? "animate-spin" : ""}`}
               />
             </button>
           </div>
           <table className="w-full text-sm">
             <tbody>
-              {(tables.data?.items ?? []).map((t) => (
+              {(snapshot.data?.items ?? []).map((t) => (
                 <tr
                   key={t.id}
                   className="border-b border-[var(--panel-mid)]/40 last:border-0 hover:bg-[var(--panel-mid)]/20"
@@ -550,10 +441,14 @@ function DatabaseInspector() {
                   </td>
                 </tr>
               ))}
-              {tables.data?.items.length === 0 && (
+              {snapshot.data?.items.length === 0 && (
                 <tr>
                   <td className="px-4 py-6 text-center text-xs text-[var(--text-muted)]">
-                    Không có table nào
+                    {snapshot.isLoading
+                      ? "Đang tải..."
+                      : snapshot.data && !snapshot.data.scannedAt
+                        ? "Config chưa có bản quét nào — bấm nút ↻ để quét."
+                        : "Không có table nào"}
                   </td>
                 </tr>
               )}
@@ -566,42 +461,94 @@ function DatabaseInspector() {
 }
 
 function RecentRuns() {
-  const overview = useDashboardOverview();
-  const runs = overview.data?.recentRuns ?? [];
-  const jobLabels = useBackupJobLabels();
+  const runs = useHistoryRuns({});
+  const chartData = useMemo(() => {
+    const days = 7;
+    const buckets = new Map<string, { success: number; failed: number }>();
+    const bucketKey = (t: number) => {
+      const d = new Date(t);
+      return `${String(d.getDate()).padStart(2, "0")}/${String(
+        d.getMonth() + 1,
+      ).padStart(2, "0")}`;
+    };
+    for (let i = days - 1; i >= 0; i--) {
+      const t = Date.now() - i * 24 * 60 * 60 * 1000;
+      buckets.set(bucketKey(t), { success: 0, failed: 0 });
+    }
+    for (const r of runs.data ?? []) {
+      const at = r.startedAt ?? r.finishedAt;
+      if (!at) continue;
+      const t = new Date(at).getTime();
+      if (Number.isNaN(t)) continue;
+      const key = bucketKey(t);
+      const bucket = buckets.get(key);
+      if (!bucket) continue;
+      if (r.status === "success") bucket.success += 1;
+      else if (r.status === "failed") bucket.failed += 1;
+    }
+    return [...buckets.entries()].map(([date, v]) => ({ date, ...v }));
+  }, [runs.data]);
+  const totalJobs = chartData.reduce(
+    (sum, b) => sum + b.success + b.failed,
+    0,
+  );
   return (
-    <Panel title="Hoạt động gần đây">
-      {runs.length === 0 ? (
-        <EmptyState
-          icon={Activity}
-          message="Chưa có hoạt động nào"
-          hint="Các lần chạy backup/sync job sẽ xuất hiện ở đây."
-        />
-      ) : (
-        <div className="max-h-[400px] divide-y divide-[var(--panel-mid)]/50 overflow-y-auto">
-          {runs.map((r) => (
-            <div key={r.id} className="flex items-center justify-between gap-3 px-5 py-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {r.jobId
-                    ? (jobLabels.get(r.jobId) ?? shortId(r.jobId))
-                    : (r.jobName ?? "—")}
-                </p>
-                <p className="mono-nums mt-0.5 text-[10px] text-[var(--text-muted)]">
-                  {r.serverName ?? "—"} · {formatDateTime(r.startedAt ?? null)} ·{" "}
-                  {r.durationMs != null ? formatDuration(r.durationMs) : "—"}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <span className="mono-nums text-xs text-[var(--panel-light)]">
-                  {r.sizeBytes ? formatBytes(r.sizeBytes) : "—"}
-                </span>
-                <StatusBadge status={r.status} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    <Panel
+      title="Hoạt động 7 ngày"
+      right={
+        <span className="mono-nums text-xs text-[var(--panel-light)]">
+          {totalJobs} job đã thực hiện
+        </span>
+      }
+    >
+      <div className="p-5">
+        {runs.isError ? (
+          <EmptyState
+            icon={Activity}
+            message={`Không tải được hoạt động: ${(runs.error as Error).message}`}
+          />
+        ) : chartData.every((b) => b.success === 0 && b.failed === 0) ? (
+          <EmptyState
+            icon={Activity}
+            message="Chưa có hoạt động nào"
+            hint="Các lần chạy backup/sync job sẽ xuất hiện ở đây."
+          />
+        ) : (
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} barSize={18} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="var(--panel-mid)" strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={50}
+                />
+                <Tooltip
+                  cursor={false}
+                  contentStyle={{
+                    background: "var(--panel-dark)",
+                    border: "1px solid var(--panel-mid)",
+                    borderRadius: 0,
+                    fontSize: 12,
+                  }}
+                  labelStyle={{ color: "var(--panel-light)" }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="success" name="Thành công" stackId="a" fill="#2c9e28" />
+                <Bar dataKey="failed" name="Thất bại" stackId="a" fill="#da391d" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
     </Panel>
   );
 }
@@ -614,19 +561,18 @@ function DashboardContent() {
     <>
       <PageHeader
         title="Dashboard"
-        sub="Tổng quan backup jobs, R2 storage và databases bạn được cấp quyền"
       />
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
           icon={DatabaseBackup}
-          label="Backup Jobs"
+          label="Lịch sao lưu dữ liệu"
           value={String(o?.backupJobCount ?? "—")}
           sub="đã đăng ký"
         />
         <StatCard
           icon={RefreshCcw}
-          label="Sync Jobs"
+          label="Lịch đồng bộ dữ liệu"
           value={String(o?.syncJobCount ?? "—")}
           sub="đã đồng bộ"
         />
@@ -638,9 +584,9 @@ function DashboardContent() {
         />
         <StatCard
           icon={Cloud}
-          label="Success Rate"
+          label="Tỉ lệ thành công"
           value={o ? `${o.successRate}%` : "—"}
-          sub={`trên ${o?.serverCount ?? 0} servers được cấp quyền`}
+          sub={`trên ${o?.projectCount ?? 0} projects được cấp quyền`}
         />
       </div>
 
@@ -648,7 +594,6 @@ function DashboardContent() {
         <StorageChart />
         <RecentRuns />
         <DatabaseInspector />
-        <JobsOverview />
       </div>
     </>
   );

@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { request, requestFile } from "@/lib/api-client";
 import { endpoints } from "@/api/endpoints";
 import { shortId } from "@/lib/format";
@@ -11,37 +16,36 @@ import type {
   BackupRun,
   CreateBackupJobPayload,
   CreateDatabaseConfigPayload,
-  CreateDatabaseServerPayload,
+  CreateProjectPayload,
   CreateSyncJobPayload,
   CreateUserPermissionPayload,
   DashboardOverview,
   DatabaseConfig,
   DatabaseConfigRef,
-  DatabaseSummary,
   DbObject,
   HistoryFilter,
   JobKind,
   ManagedUser,
+  PageResult,
   PermissionResourceType,
-  RawServer,
-  Server,
+  Project,
+  RawProject,
   StorageSnapshot,
   SyncJob,
   UpdateBackupJobPayload,
   UpdateDatabaseConfigPayload,
-  UpdateDatabaseServerPayload,
+  UpdateProjectPayload,
   UpdateUserPermissionPayload,
   UserPermission,
 } from "@/types/api";
 
 const KEYS = {
-  servers: ["servers"] as const,
+  projects: ["projects"] as const,
   databaseConfigs: ["database-configs"] as const,
   users: ["users"] as const,
   userPermissions: ["user-permissions"] as const,
-  databases: (serverId: string) => ["servers", serverId, "databases"] as const,
-  tables: (serverId: string, db: string) =>
-    ["servers", serverId, "databases", db, "tables"] as const,
+  snapshot: (databaseConfigId: string) =>
+    ["snapshot", databaseConfigId] as const,
   backupJobs: ["jobs", "backup"] as const,
   syncJobs: ["jobs", "sync"] as const,
   history: (filter: HistoryFilter) => ["history", filter] as const,
@@ -58,13 +62,36 @@ function unwrapMany<T>(data: ManyResponse<T>): T[] {
   return [];
 }
 
-// /database-inspector trả MỘT object snapshot ({ success, data: { scope, status, scannedAt, errorMessage, data: [...] } })
-// hoặc data = null khi server/db chưa từng được quét
+// GET /<resource>/page — BE bọc { success, data: PageableDto },
+// PageableDto = { total, skip, limit, page, result: [...] }
+function parsePage<T>(
+  body: unknown,
+  mapItem: (raw: Record<string, unknown>) => T,
+): PageResult<T> {
+  const rec = (body ?? {}) as Record<string, unknown>;
+  const data = (rec.data && typeof rec.data === "object"
+    ? rec.data
+    : rec) as Record<string, unknown>;
+  const items = Array.isArray(data.result) ? data.result : [];
+  return {
+    total: typeof data.total === "number" ? data.total : items.length,
+    skip: typeof data.skip === "number" ? data.skip : 0,
+    limit: typeof data.limit === "number" ? data.limit : items.length,
+    page: typeof data.page === "number" ? data.page : 1,
+    result: (items as Record<string, unknown>[]).map(mapItem),
+  };
+}
+
+// /database-inspector/:configId/tables trả MỘT object snapshot của config
+// ({ success, data: { scope, status, databaseName, errorMessage, scannedAt, data: [...] } })
+// hoặc data = null khi config chưa từng được quét
 export type InspectionPayload<T> = {
   items: T[];
   scannedAt: string | null;
   status: string | null;
   errorMessage: string | null;
+  databaseName: string | null;
+  scope: string | null;
 };
 
 function parseInspection<T>(
@@ -72,7 +99,14 @@ function parseInspection<T>(
   mapItem: (raw: Record<string, unknown>) => T,
 ): InspectionPayload<T> {
   if (Array.isArray(body)) {
-    return { items: body.map(mapItem), scannedAt: null, status: null, errorMessage: null };
+    return {
+      items: body.map(mapItem),
+      scannedAt: null,
+      status: null,
+      errorMessage: null,
+      databaseName: null,
+      scope: null,
+    };
   }
   const rec = (body ?? {}) as Record<string, unknown>;
   const inner = rec.data;
@@ -90,6 +124,8 @@ function parseInspection<T>(
     scannedAt: snap ? str(snap.scannedAt) : null,
     status: snap ? str(snap.status) : null,
     errorMessage: snap ? str(snap.errorMessage) : null,
+    databaseName: snap ? str(snap.databaseName) : null,
+    scope: snap ? str(snap.scope) : null,
   };
 }
 
@@ -113,28 +149,25 @@ function num(v: unknown): number | undefined {
   return typeof v === "number" ? v : undefined;
 }
 
-function mapServer(raw: RawServer): Server {
+// Nhận cả number lẫn chuỗi số ("28212" → 28212); BE hay trả size dạng string
+function numLike(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+// Item thật của GET /projects/many: { _id, name, createdAt, updatedAt }
+function mapProject(raw: RawProject): Project {
   return {
     id: raw._id ?? raw.id ?? "",
-    name: raw.serverName ?? raw.name ?? "(không tên)",
-    environment: raw.environment ?? null,
-    type: raw.type ?? raw.dbType ?? "postgres",
-    host: raw.host ?? null,
-    port: raw.port ?? null,
-    username: raw.username ?? null,
-    status: "online",
+    name: raw.name ?? "(không tên)",
   };
 }
 
-// Item database thật của BE: { name, sizeBytes }
-function mapDatabase(raw: Record<string, unknown>): DatabaseSummary {
-  return {
-    databaseName: (raw.databaseName ?? raw.name ?? "(không tên)") as string,
-    totalBytes: num(raw.totalBytes ?? raw.sizeBytes),
-  };
-}
-
-// Item table thật của BE có thể là { name, rowCount, sizeBytes } hoặc { tableName, ... }
+// Item row/table thật của snapshot config có thể là { name, rowCount, sizeBytes } hoặc { tableName, ... }
 function mapDbObject(raw: Record<string, unknown>): DbObject {
   return {
     id: String(raw.id ?? raw._id ?? raw.tableName ?? raw.name ?? ""),
@@ -187,10 +220,12 @@ function mapBackupRun(raw: Record<string, unknown>): BackupRun {
         : statusRaw === "failed"
           ? "failed"
           : "running",
-    sizeBytes: num(raw.size ?? raw.sizeBytes) ?? null,
+    sizeBytes: numLike(raw.size ?? raw.sizeBytes),
     durationMs,
     fileName: str(raw.fileName),
     log: [stdout, stderr].filter(Boolean).join("\n") || null,
+    stdout,
+    stderr,
     filePath: str(raw.filePath),
     tool: str(raw.tool),
     exitCode: num(raw.exitCode) ?? null,
@@ -199,6 +234,7 @@ function mapBackupRun(raw: Record<string, unknown>): BackupRun {
 }
 
 // Sync job thật của BE: config nguồn/đích nằm lồng trong item (có _id riêng)
+// Config thật của BE: config code + đủ field kết nối (thay database-server cũ)
 function mapConfig(raw: Record<string, unknown>): DatabaseConfigRef {
   return {
     id: String(raw.id ?? raw._id ?? ""),
@@ -209,6 +245,8 @@ function mapConfig(raw: Record<string, unknown>): DatabaseConfigRef {
     databaseName: str(raw.databaseName),
     username: str(raw.username),
     environment: str(raw.environment),
+    databaseServerId: str(raw.databaseServerId),
+    projectId: str(raw.projectId),
   };
 }
 
@@ -271,7 +309,7 @@ function mapSyncRun(raw: Record<string, unknown>): BackupRun {
 function mapDatabaseConfig(raw: Record<string, unknown>): DatabaseConfig {
   return {
     ...mapConfig(raw),
-    databaseServerId: str(raw.databaseServerId),
+    projectId: str(raw.projectId) ?? str(raw.databaseServerId),
     createdAt: str(raw.createdAt),
     updatedAt: str(raw.updatedAt),
   };
@@ -282,21 +320,34 @@ function useInvalidateAll() {
   return () => qc.invalidateQueries();
 }
 
-// ── Servers / database inspector ─────────────────────────────────
+// ── Projects / database configs / inspector ─────────────────────
 
-export function useServers() {
+export function useProjects() {
   return useQuery({
-    queryKey: KEYS.servers,
+    queryKey: KEYS.projects,
     queryFn: async () =>
-      unwrapMany<RawServer>(await request(endpoints.servers.list)).map(mapServer),
+      unwrapMany<RawProject>(await request(endpoints.projects.list)).map(mapProject),
   });
 }
 
-export function useCreateDatabaseServer() {
+// Phân trang server: GET /projects/page?page&limit — dùng cho bảng Projects
+export function useProjectsPage(params: { page: number; limit: number }) {
+  return useQuery({
+    queryKey: [...KEYS.projects, "page", params.page, params.limit] as const,
+    queryFn: async () =>
+      parsePage<Project>(
+        await request(endpoints.projects.page(params)),
+        (raw) => mapProject(raw as RawProject),
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useCreateProject() {
   const invalidateAll = useInvalidateAll();
   return useMutation({
-    mutationFn: (payload: CreateDatabaseServerPayload) =>
-      request<unknown>(endpoints.servers.create, {
+    mutationFn: (payload: CreateProjectPayload) =>
+      request<unknown>(endpoints.projects.create, {
         method: "POST",
         // api-client tự JSON.stringify — không stringify sẵn để tránh double-encode
         body: payload,
@@ -305,11 +356,11 @@ export function useCreateDatabaseServer() {
   });
 }
 
-export function useUpdateDatabaseServer() {
+export function useUpdateProject() {
   const invalidateAll = useInvalidateAll();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: UpdateDatabaseServerPayload }) =>
-      request<unknown>(endpoints.servers.update(id), {
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateProjectPayload }) =>
+      request<unknown>(endpoints.projects.update(id), {
         method: "PUT",
         body: payload,
       }),
@@ -317,11 +368,11 @@ export function useUpdateDatabaseServer() {
   });
 }
 
-export function useDeleteDatabaseServer() {
+export function useDeleteProject() {
   const invalidateAll = useInvalidateAll();
   return useMutation({
     mutationFn: (id: string) =>
-      request<unknown>(endpoints.servers.remove(id), { method: "DELETE" }),
+      request<unknown>(endpoints.projects.remove(id), { method: "DELETE" }),
     onSuccess: invalidateAll,
   });
 }
@@ -335,6 +386,19 @@ export function useDatabaseConfigs() {
       unwrapMany<Record<string, unknown>>(
         await request(endpoints.databaseConfigs.list),
       ).map(mapDatabaseConfig),
+  });
+}
+
+// Phân trang server: GET /database-config/page?page&limit — dùng cho bảng Config
+export function useDatabaseConfigsPage(params: { page: number; limit: number }) {
+  return useQuery({
+    queryKey: [...KEYS.databaseConfigs, "page", params.page, params.limit] as const,
+    queryFn: async () =>
+      parsePage<DatabaseConfig>(
+        await request(endpoints.databaseConfigs.page(params)),
+        mapDatabaseConfig,
+      ),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -373,58 +437,31 @@ export function useDeleteDatabaseConfig() {
   });
 }
 
-export function useDatabases(serverId: string | null) {
-  return useQuery({
-    queryKey: serverId !== null ? KEYS.databases(serverId) : ["servers", "databases"],
-    queryFn: async () =>
-      parseInspection(
-        await request(endpoints.inspector.databases(serverId!)),
-        mapDatabase,
-      ),
-    enabled: serverId !== null,
-  });
-}
-
-export function useTables(serverId: string | null, databaseName: string | null) {
+// Snapshot của một database config — data = bảng (tables) của database config đó
+export function useConfigSnapshot(databaseConfigId: string | null) {
   return useQuery({
     queryKey:
-      serverId !== null && databaseName !== null
-        ? KEYS.tables(serverId, databaseName)
-        : ["servers", "tables"],
+      databaseConfigId !== null
+        ? KEYS.snapshot(databaseConfigId)
+        : ["snapshot", "none"],
     queryFn: async () =>
       parseInspection(
-        await request(endpoints.inspector.tables(serverId!, databaseName!)),
+        await request(endpoints.inspector.tables(databaseConfigId!)),
         mapDbObject,
       ),
-    enabled: serverId !== null && databaseName !== null,
+    enabled: databaseConfigId !== null,
   });
 }
 
-export function useRescanServer() {
+// POST /database-inspector/:configId/rescan — bất đồng bộ (BullMQ),
+// snapshot mới có scannedAt mới; FE poll snapshot qua useConfigSnapshot
+export function useRescanConfig() {
   const invalidate = useInvalidateAll();
   return useMutation({
-    mutationFn: (serverId: string) =>
-      request<unknown>(endpoints.inspector.rescanServer(serverId), {
+    mutationFn: (databaseConfigId: string) =>
+      request<unknown>(endpoints.inspector.rescan(databaseConfigId), {
         method: "POST",
       }),
-    onSuccess: () => invalidate(),
-  });
-}
-
-export function useRescanTables() {
-  const invalidate = useInvalidateAll();
-  return useMutation({
-    mutationFn: ({
-      serverId,
-      databaseName,
-    }: {
-      serverId: string;
-      databaseName: string;
-    }) =>
-      request<unknown>(
-        endpoints.inspector.rescanTables(serverId, databaseName),
-        { method: "POST" },
-      ),
     onSuccess: () => invalidate(),
   });
 }
@@ -445,6 +482,41 @@ export function useBackupJobs() {
   });
 }
 
+// Phân trang server: GET /backup-job/page?page&limit — dùng cho tab Backup Jobs
+export function useBackupJobsPage(params: { page: number; limit: number }) {
+  return useQuery({
+    queryKey: [...KEYS.backupJobs, "page", params.page, params.limit] as const,
+    queryFn: async () =>
+      parsePage<BackupJobWithServer>(
+        await request(endpoints.backupJobs.page(params)),
+        (raw) =>
+          withNestedJob(
+            withIds<BackupJobWithServer>([raw as unknown as BackupJobWithServer]),
+          )[0] as BackupJobWithServer,
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
+
+// GET /backup-job/count — endpoint nhẹ trả { total, active } cho dashboard,
+// tránh phải kéo /backup-job/many full list chỉ để đếm.
+export function useBackupJobCount() {
+  return useQuery({
+    queryKey: [...KEYS.backupJobs, "count"],
+    queryFn: async () => {
+      // Response bọc trong { success, data } như các endpoint khác của BE
+      const body = await request<unknown>(endpoints.backupJobs.count);
+      const rec = body as { success?: boolean; data?: unknown } | null;
+      const inner =
+        rec && typeof rec === "object" && "data" in rec ? rec.data : body;
+      const counts = (inner ?? {}) as { total?: number; active?: number };
+      return { total: counts.total ?? 0, active: counts.active ?? 0 };
+    },
+    // isActive hiếm đổi — không cần poll nhanh
+    refetchInterval: 30_000,
+  });
+}
+
 export function useSyncJobs() {
   return useQuery({
     queryKey: KEYS.syncJobs,
@@ -460,6 +532,19 @@ export function useSyncJobs() {
       );
       return active ? 3000 : 15000;
     },
+  });
+}
+
+// Phân trang server: GET /sync-job/page?page&limit — dùng cho tab Sync Jobs
+export function useSyncJobsPage(params: { page: number; limit: number }) {
+  return useQuery({
+    queryKey: [...KEYS.syncJobs, "page", params.page, params.limit] as const,
+    queryFn: async () =>
+      parsePage<SyncJob>(
+        await request(endpoints.syncJobs.page(params)),
+        mapSyncJob,
+      ),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -733,9 +818,9 @@ export function useMyPermissionsView() {
 // ── Dashboard (tổng hợp phía client từ các endpoint có sẵn) ──────
 
 export function useDashboardOverview() {
-  const backups = useBackupJobs();
+  const counts = useBackupJobCount();
   const syncs = useSyncJobs();
-  const servers = useServers();
+  const projects = useProjects();
   const runs = useHistoryRuns({});
   // Mốc "7 ngày gần nhất" — chốt 1 lần khi mount để useMemo giữ tính thuần khiết
   const [weekCutoff] = useState(
@@ -743,7 +828,7 @@ export function useDashboardOverview() {
   );
 
     const data = useMemo<DashboardOverview | undefined>(() => {
-      if (!backups.data || !syncs.data || !servers.data || !runs.data) return undefined;
+      if (!counts.data || !syncs.data || !projects.data || !runs.data) return undefined;
       const allRuns = [...runs.data].sort(
         (a, b) =>
           new Date(b.startedAt ?? 0).getTime() - new Date(a.startedAt ?? 0).getTime(),
@@ -755,23 +840,21 @@ export function useDashboardOverview() {
       );
       const successful = weekRuns.filter((r) => r.status === "success").length;
       return {
-        backupJobCount: backups.data.length,
+        backupJobCount: counts.data.total,
         syncJobCount: syncs.data.length,
-        // BE không có trạng thái "running" ở mức job — backup job có boolean isActive,
-        // sync job chỉ có status lần chạy → chỉ đếm backup active
-        runningCount: backups.data.filter((r) => r.job.isActive).length,
-        serverCount: servers.data.length,
+        runningCount: counts.data.active,
+        projectCount: projects.data.length,
         successRate: weekRuns.length
           ? Math.round((successful / weekRuns.length) * 100)
           : 100,
         recentRuns: allRuns.slice(0, 6),
       };
-    }, [backups.data, syncs.data, servers.data, runs.data, weekCutoff]);
+    }, [counts.data, syncs.data, projects.data, runs.data, weekCutoff]);
 
   return {
     data,
     isLoading:
-      backups.isLoading || syncs.isLoading || servers.isLoading || runs.isLoading,
+      counts.isLoading || syncs.isLoading || projects.isLoading || runs.isLoading,
   };
 }
 

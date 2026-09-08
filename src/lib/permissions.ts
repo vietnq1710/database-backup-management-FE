@@ -1,9 +1,9 @@
 // Khớp mô hình phân quyền thật của BE:
 // - Entry = { userId, resourceType, resourceId, permissions[] }
-// - resourceType chỉ quyết định phạm vi áp dụng (global / theo server / theo database)
+// - resourceType chỉ quyết định phạm vi áp dụng (global / theo project / theo config)
 //   còn permissions có thể là BẤT KỲ action nào — vd entry global chứa
-//   database-server:manage + permission:manage là hợp lệ.
-// - "Tạo server" (database-server:create) được cấp kiểu global, không cần chọn server.
+//   project:manage + permission:manage là hợp lệ.
+// - "Tạo project" (project:create) được cấp kiểu global, không cần chọn project.
 // FE chỉ gán permission có sẵn trong danh sách này — không cho nhập tự do.
 import type { PermissionResourceType } from "@/types/api";
 
@@ -12,7 +12,7 @@ export const RESOURCE_TYPES: ReadonlyArray<{
   label: string;
 }> = [
   { value: "global", label: "Toàn cục (global)" },
-  { value: "database-server", label: "Database Server" },
+  { value: "project", label: "Project" },
   { value: "database-config", label: "Database Config" },
 ];
 
@@ -21,10 +21,10 @@ export const ALL_PERMISSIONS: ReadonlyArray<{
   label: string;
   group: string;
 }> = [
-  // Database Server
-  { action: "database-server:create", label: "Tạo server", group: "Database Server" },
-  { action: "database-server:manage", label: "Quản lý server", group: "Database Server" },
-  { action: "database-server:view", label: "Xem server", group: "Database Server" },
+  // Project
+  { action: "project:create", label: "Tạo project", group: "Project" },
+  { action: "project:manage", label: "Quản lý project", group: "Project" },
+  { action: "project:view", label: "Xem project", group: "Project" },
   // Database Config
   { action: "database-config:manage", label: "Quản lý config", group: "Database Config" },
   { action: "database-config:view", label: "Xem config", group: "Database Config" },
@@ -46,16 +46,16 @@ export const DATABASE_CONFIG_ACTIONS = ALL_PERMISSIONS.filter((o) =>
   o.action.startsWith("database-config:"),
 ).map((o) => o.action);
 
-// Các quyền phía database-server — bị ẩn khi gán quyền cho entry database-config
-export const DATABASE_SERVER_ACTIONS = ALL_PERMISSIONS.filter((o) =>
-  o.action.startsWith("database-server:"),
+// Các quyền phía project — bị ẩn khi gán quyền cho entry database-config
+export const PROJECT_ACTIONS = ALL_PERMISSIONS.filter((o) =>
+  o.action.startsWith("project:"),
 ).map((o) => o.action);
 
 export const PERMISSION_MANAGE_ACTION = "permission:manage";
-export const SERVER_CREATE_ACTION = "database-server:create";
+export const PROJECT_CREATE_ACTION = "project:create";
 
 // Quyền chỉ có ý nghĩa ở phạm vi toàn cục — chỉ cấp qua entry global
-const GLOBAL_ONLY_ACTIONS = [SERVER_CREATE_ACTION, PERMISSION_MANAGE_ACTION];
+const GLOBAL_ONLY_ACTIONS = [PROJECT_CREATE_ACTION, PERMISSION_MANAGE_ACTION];
 
 // Quyền bị ẩn khi gán cho entry KHÔNG phải global
 export function hiddenActionsForResource(
@@ -64,7 +64,7 @@ export function hiddenActionsForResource(
   if (resourceType === "global") return [];
   if (resourceType === "database-config")
     return [
-      ...DATABASE_SERVER_ACTIONS.filter((a) => a !== SERVER_CREATE_ACTION),
+      ...PROJECT_ACTIONS.filter((a) => a !== PROJECT_CREATE_ACTION),
       ...GLOBAL_ONLY_ACTIONS,
     ];
   return [...GLOBAL_ONLY_ACTIONS];

@@ -7,7 +7,7 @@ import {
   useDeleteUserPermission,
   useEnsureUserPermission,
   useMyPermissionsView,
-  useServers,
+  useProjects,
   useUpdateUserPermission,
   useUserPermissions,
   useUsers,
@@ -33,7 +33,7 @@ const inputCls =
   "w-full border border-[var(--panel-mid)] bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-[var(--accent-blue)] placeholder:text-[var(--text-muted)]";
 const selectCls = inputCls + " appearance-none";
 const submitBtnCls =
-  "flex w-full items-center justify-center gap-2 border border-white bg-white py-2.5 text-[11px] font-black uppercase tracking-[0.25em] text-[var(--panel-dark)] transition-all hover:bg-transparent hover:text-white disabled:opacity-50";
+  "flex w-full items-center justify-center gap-2 border border-[var(--foreground)] bg-[var(--foreground)] py-2.5 text-[11px] font-black uppercase tracking-[0.25em] text-[var(--background)] transition-all hover:bg-transparent hover:text-[var(--foreground)] disabled:opacity-50";
 const thCls =
   "panel-label px-5 py-3 text-left font-extrabold whitespace-nowrap";
 const tdCls = "px-5 py-3 align-middle";
@@ -51,7 +51,7 @@ function DialogHeader({
       <button
         type="button"
         onClick={onClose}
-        className="text-[var(--text-muted)] hover:text-white"
+        className="text-[var(--text-muted)] hover:text-[var(--foreground)]"
       >
         <X className="h-4 w-4" />
       </button>
@@ -75,7 +75,7 @@ function userLabel(u?: ManagedUser): string {
 
 // Lưới checkbox chọn permission — hiện TOÀN BỘ quyền nhóm theo nhóm,
 // vì BE cho phép gắn bất kỳ action nào lên entry bất kỳ resourceType
-// (vd entry global chứa database-server:manage + permission:manage).
+// (vd entry global chứa project:manage + permission:manage).
 function PermissionChecks({
   selected,
   onToggle,
@@ -130,7 +130,7 @@ function PermissionChecks({
 // POST /user-permission: userId + resourceType + resourceId? + permissions[]
 function CreatePermissionDialog({ onClose }: { onClose: () => void }) {
   const users = useUsers();
-  const servers = useServers();
+  const projects = useProjects();
   const configs = useDatabaseConfigs();
   const [userId, setUserId] = useState("");
   const [resourceType, setResourceType] =
@@ -214,10 +214,10 @@ function CreatePermissionDialog({ onClose }: { onClose: () => void }) {
           ))}
         </select>
 
-        {resourceType === "database-server" && (
+        {resourceType === "project" && (
           <>
-            <label className="panel-label mb-1.5 block">Server</label>
-            {(servers.data ?? []).length > 0 ? (
+            <label className="panel-label mb-1.5 block">Project</label>
+            {(projects.data ?? []).length > 0 ? (
               <select
                 className={selectCls + " mb-4"}
                 value={resourceId}
@@ -225,11 +225,11 @@ function CreatePermissionDialog({ onClose }: { onClose: () => void }) {
                 required
               >
                 <option value="" disabled>
-                  — chọn server áp dụng —
+                  — chọn project áp dụng —
                 </option>
-                {(servers.data ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.type})
+                {(projects.data ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
                   </option>
                 ))}
               </select>
@@ -238,7 +238,7 @@ function CreatePermissionDialog({ onClose }: { onClose: () => void }) {
                 className={inputCls + " mono-nums mb-4 text-xs"}
                 value={resourceId}
                 onChange={(e) => setResourceId(e.target.value)}
-                placeholder="serverId (bỏ trống = tất cả)"
+                placeholder="projectId (bỏ trống = tất cả)"
               />
             )}
           </>
@@ -315,24 +315,24 @@ function EditPermissionDialog({
 
   // --- quyền liên quan trên cùng tài nguyên ---
   const relatedConfigs =
-    perm.resourceType === "database-server" && perm.resourceId
+    perm.resourceType === "project" && perm.resourceId
       ? (configs.data ?? []).filter(
-          (c) => c.databaseServerId === perm.resourceId,
+          (c) => c.projectId === perm.resourceId,
         )
       : [];
   const siblingConfigs =
     perm.resourceType === "database-config" && perm.resourceId
       ? (configs.data ?? []).filter(
           (c) =>
-            c.databaseServerId &&
-            c.databaseServerId ===
+            c.projectId &&
+            c.projectId ===
               configs.data?.find((x) => x.id === perm.resourceId)
-                ?.databaseServerId &&
+                ?.projectId &&
             c.id !== perm.resourceId,
         )
       : [];
   const relTargets =
-    perm.resourceType === "database-server"
+    perm.resourceType === "project"
       ? relatedConfigs
       : perm.resourceType === "database-config"
         ? siblingConfigs
@@ -415,9 +415,9 @@ function EditPermissionDialog({
         {relTargets.length > 0 && (
           <div className="mb-4 border border-[var(--panel-mid)] p-3">
             <label className="panel-label mb-2 block">
-              {perm.resourceType === "database-server"
-                ? "Thêm quyền Database Config trên cùng server"
-                : "Áp dụng thêm cho config khác cùng server"}
+              {perm.resourceType === "project"
+                ? "Thêm quyền Database Config trên cùng project"
+                : "Áp dụng thêm cho config khác cùng project"}
             </label>
             <div className="mb-3 grid max-h-40 grid-cols-1 gap-1 overflow-y-auto sm:grid-cols-2">
               {relTargets.map((c) => (
@@ -470,7 +470,7 @@ function EditPermissionDialog({
 function AdminPermissions() {
   const perms = useUserPermissions();
   const users = useUsers();
-  const servers = useServers();
+  const projects = useProjects();
   const configs = useDatabaseConfigs();
   const remove = useDeleteUserPermission();
   const { addNotification } = useNotifications();
@@ -482,15 +482,15 @@ function AdminPermissions() {
   >(null);
 
   const userById = new Map((users.data ?? []).map((u) => [u.id, u]));
-  const serverById = new Map((servers.data ?? []).map((s) => [s.id, s]));
+  const projectById = new Map((projects.data ?? []).map((p) => [p.id, p]));
   const configById = new Map((configs.data ?? []).map((c) => [c.id, c]));
 
   const resourceLabel = (p: UserPermission): string => {
     if (p.resourceType === "global") return "Toàn cục";
     if (!p.resourceId) return "Tất cả";
     const named =
-      p.resourceType === "database-server"
-        ? serverById.get(p.resourceId)?.name
+      p.resourceType === "project"
+        ? projectById.get(p.resourceId)?.name
         : (configById.get(p.resourceId)?.configCode ??
           configById.get(p.resourceId)?.databaseName);
     return named ?? shortId(p.resourceId);
@@ -517,7 +517,7 @@ function AdminPermissions() {
         right={
           <button
             onClick={() => setDialog({ kind: "create" })}
-            className="flex items-center gap-2 border border-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] transition-colors hover:bg-white hover:text-[var(--panel-dark)]"
+            className="flex items-center gap-2 border border-[var(--foreground)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] transition-colors hover:bg-[var(--foreground)] hover:text-[var(--background)]"
           >
             <Plus className="h-3.5 w-3.5" />
             Gán quyền
@@ -585,7 +585,7 @@ function AdminPermissions() {
                           <button
                             title="Sửa"
                             disabled={busy}
-                            className="flex h-8 w-8 items-center justify-center border border-[var(--panel-mid)] text-[var(--panel-light)] transition-colors hover:border-[var(--accent-blue)] hover:text-white disabled:opacity-40"
+                            className="flex h-8 w-8 items-center justify-center border border-[var(--panel-mid)] text-[var(--panel-light)] transition-colors hover:border-[var(--accent-blue)] hover:text-[var(--foreground)] disabled:opacity-40"
                             onClick={() =>
                               setDialog({
                                 kind: "edit",
@@ -671,7 +671,6 @@ function PermissionsContent() {
     <>
       <PageHeader
         title="Phân quyền"
-        sub="Danh sách quyền hạn của user trong hệ thống"
       />
       <AdminPermissions />
     </>

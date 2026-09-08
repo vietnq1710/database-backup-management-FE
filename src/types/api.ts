@@ -12,67 +12,48 @@ export interface User {
 
 // BE trả "postgres" | "mongo"
 export type DbType = "postgres" | "mongo";
-export type ServerStatus = "online" | "offline" | "degraded";
 
-// ── Enum thật của BE (22/08/2026) ────────────────────────────────
+// ── Enum thật của BE (06/09/2026) ────────────────────────────────
 
 export type DatabaseEngine = "postgres" | "mongo";
 export type EnvironmentType = "DEVELOPMENT" | "UAT" | "STAGING" | "PRODUCTION";
 
 // ── Raw shapes từ BE (Mongo, _id là ObjectId string) ────────────
 
-export interface RawServer {
+export interface RawProject {
   _id?: string;
   id?: string;
-  serverName?: string;
-  name?: string;
-  environment?: string | null;
-  type?: DbType;
-  dbType?: DbType;
-  host?: string | null;
-  port?: number | null;
-  username?: string | null;
-  connectionOptions?: string | null;
+  name?: string | null;
   createdAt?: unknown;
   updatedAt?: unknown;
 }
 
 // ── FE shapes ────────────────────────────────────────────────────
 
-export interface Server {
+// GET /<resource>/page — response BE (bọc trong { success, data }):
+// { total, skip, limit, page, result: [...] }
+export interface PageResult<T> {
+  total: number;
+  skip: number;
+  limit: number;
+  page: number;
+  result: T[];
+}
+
+// Project thay thế database-server cũ (06/09/2026) — entity chỉ có _id + name
+export interface Project {
   id: string;
   name: string;
-  environment: string | null;
-  type: DbType;
-  host: string | null;
-  port: number | null;
-  username: string | null;
-  status: ServerStatus;
-  connectionOptions?: string | null;
 }
 
-// DTO thật của POST /database-server (22/08/2026)
-export interface CreateDatabaseServerPayload {
-  serverName: string;
-  environment: EnvironmentType;
-  type: DatabaseEngine;
-  host: string;
-  port: number;
-  username: string;
-  password: string;
-  connectionOptions?: string;
+// DTO thật của POST /projects — chỉ có name (unique)
+export interface CreateProjectPayload {
+  name: string;
 }
 
-// PUT /database-server/:id — base controller dùng PartialType(entity) nên mọi trường optional
-export interface UpdateDatabaseServerPayload {
-  serverName?: string;
-  environment?: EnvironmentType;
-  type?: DatabaseEngine;
-  host?: string;
-  port?: number;
-  username?: string;
-  password?: string;
-  connectionOptions?: string;
+// PUT /projects/:id — base controller dùng PartialType(entity) nên mọi trường optional
+export interface UpdateProjectPayload {
+  name?: string;
 }
 
 export interface DatabaseSummary {
@@ -120,6 +101,7 @@ export function jobStatusOf(
 
 // Shape thật của GET /sync-job/many (22/08/2026): KHÔNG có cronExpression/isActive.
 // Có status lần chạy ("SUCCESS"/"FAILED"...) và config nguồn/đích populate sẵn.
+// Config mới (06/09/2026) mang đủ field thay cho database-server.
 export interface DatabaseConfigRef {
   id: string;
   configCode: string | null;
@@ -129,27 +111,42 @@ export interface DatabaseConfigRef {
   databaseName: string | null;
   username?: string | null;
   environment?: string | null;
+  databaseServerId?: string | null;
+  projectId?: string | null;
 }
 
 // Item đầy đủ của GET /database-config/many (shape khớp phần populate trong sync job)
 export type DatabaseConfig = DatabaseConfigRef & {
-  databaseServerId: string | null;
+  projectId: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
 
-// DTO thật của POST /database-config (22/08/2026)
+// DTO thật của POST /database-config (06/09/2026): projectId thay databaseServerId,
+// config mang đủ field thay cho server (host/port/username/password/environment)
 export interface CreateDatabaseConfigPayload {
   configCode: string;
-  databaseServerId: string;
+  projectId: string;
+  databaseType: DatabaseEngine;
+  host: string;
+  port: number;
+  username: string;
+  password: string;
   databaseName: string;
+  environment: EnvironmentType;
 }
 
-// DTO thật của PUT /database-config/:id (22/08/2026) — mọi trường đều optional
+// DTO thật của PUT /database-config/:id (06/09/2026) — mọi trường đều optional
 export interface UpdateDatabaseConfigPayload {
   configCode?: string;
+  projectId?: string;
+  databaseType?: DatabaseEngine;
+  host?: string;
+  port?: number;
   username?: string;
   password?: string;
+  databaseName?: string;
+  environment?: EnvironmentType;
 }
 
 export interface SyncJob {
@@ -178,6 +175,9 @@ export interface BackupRun {
   durationMs?: number | null;
   fileName?: string | null;
   log?: string | null;
+  // Raw stdout/stderr riêng (dùng cho tải log)
+  stdout?: string | null;
+  stderr?: string | null;
   startedAt?: string | null;
   finishedAt?: string | null;
   // Shape thật của GET /backup-history/many (22/08/2026)
@@ -193,7 +193,7 @@ export interface DashboardOverview {
   backupJobCount: number;
   syncJobCount: number;
   runningCount: number;
-  serverCount: number;
+  projectCount: number;
   successRate: number;
   recentRuns: BackupRun[];
 }
@@ -242,9 +242,8 @@ export interface HistoryFilter {
 
 // ── User permission (22/08/2026) ─────────────────────────────────
 
-// Giá trị thật của enum PermissionResourceType bên BE
-export type PermissionResourceType =
-  "database-server" | "database-config" | "global";
+// Giá trị thật của enum PermissionResourceType bên BE (06/09/2026)
+export type PermissionResourceType = "project" | "database-config" | "global";
 
 // Item của GET /user-permission/many
 export interface UserPermission {
