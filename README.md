@@ -2,7 +2,7 @@
 
 Frontend React SPA cho hệ thống quản lý backup database, kết nối tới backend NestJS qua REST API (JWT Bearer).
 
-Giao diện tiếng Việt gồm: Dashboard tổng quan (thống kê, biểu đồ dung lượng R2, Database Inspector), trang Quản lý Job (backup/sync), Backup History (log + tải file), Servers, Permissions và trang Đăng nhập Keycloak SSO.
+Giao diện tiếng Việt gồm: Dashboard tổng quan (thống kê, biểu đồ dung lượng R2, Database Inspector), trang Quản lý Job (backup/sync), Backup History (log + tải file), Projects, Permissions và trang Đăng nhập Keycloak SSO.
 
 ## Tech Stack
 
@@ -65,16 +65,14 @@ Toàn bộ path nằm tập trung trong **`src/api/endpoints.ts`**, map theo con
 
 | Method       | Path BE                                              | Dùng ở             |
 | ------------ | ---------------------------------------------------- | ------------------ |
-| GET          | `/database-server/many`                              | Dashboard, Servers |
-| POST         | `/database-server`                                   | Servers            |
-| PUT / DELETE | `/database-server/:id`                               | Servers            |
-| GET          | `/database-config/many`                              | Servers            |
-| POST         | `/database-config`                                   | Servers            |
-| PUT          | `/database-config/:id`                               | Servers            |
-| GET          | `/database-inspector/:serverId/databases`            | Dashboard          |
-| GET          | `/database-inspector/:serverId/databases/:db/tables` | Dashboard          |
-| POST         | `/database-inspector/:serverId/rescan`               | Dashboard          |
-| POST         | `/database-inspector/:serverId/databases/:db/rescan` | Dashboard          |
+| GET          | `/projects/many`                                     | Dashboard, Projects|
+| POST         | `/projects`                                          | Projects           |
+| PUT / DELETE | `/projects/:id`                                      | Projects           |
+| GET          | `/database-config/many`                              | Projects           |
+| POST         | `/database-config`                                   | Projects           |
+| PUT          | `/database-config/:id`                               | Projects           |
+| GET          | `/database-inspector/:databaseConfigId/tables`       | Dashboard          |
+| POST         | `/database-inspector/:databaseConfigId/rescan`       | Dashboard          |
 | GET / POST   | `/backup-job/many`, `/backup-job`                    | Jobs               |
 | PUT / DELETE | `/backup-job/:id`                                    | Jobs               |
 | GET / POST   | `/sync-job/many`, `/sync-job`                        | Jobs               |
@@ -189,8 +187,8 @@ Browser → /api/storage/history
 │   ├── pages/
 │   │   ├── Dashboard.tsx      # Thống kê, R2 chart, DB inspector
 │   │   ├── Jobs.tsx           # Quản lý backup/sync job
-│   │   ├── History.tsx        # Lịch sử chạy + log + tải file
-│   │   ├── Servers.tsx        # Quản lý server & database config
+│   │   ├── History.tsx        # Lịch sử chạy + log + tải file (tab trong Jobs)
+│   │   ├── Projects.tsx       # Quản lý project & database config
 │   │   ├── Permissions.tsx    # Quản lý quyền người dùng (admin)
 │   │   ├── Login.tsx          # Đăng nhập Keycloak SSO
 │   │   ├── AuthCallback.tsx   # Xử lý callback từ Keycloak
