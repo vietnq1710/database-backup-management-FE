@@ -7,7 +7,7 @@ export default function NotFound() {
       <p className="text-sm text-[var(--text-muted)]">Trang không tồn tại</p>
       <Link
         to="/"
-        className="border border-white px-6 py-2.5 text-[10px] font-black uppercase tracking-[0.25em] transition-colors hover:bg-white hover:text-[var(--panel-dark)]"
+        className="border border-[var(--foreground)] px-6 py-2.5 text-[10px] font-black uppercase tracking-[0.25em] transition-colors hover:bg-[var(--foreground)] hover:text-[var(--background)]"
       >
         Về Dashboard
       </Link>

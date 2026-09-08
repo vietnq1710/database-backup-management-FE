@@ -10,19 +10,30 @@ import { LOGIN_PATH } from "@/const";
 import { useMyPermissionsView, useCompletionNotifications } from "@/api/hooks";
 import {
   DatabaseBackup,
-  History,
   LayoutDashboard,
   LogOut,
+  PanelLeftClose,
   ServerCog,
   ShieldCheck,
 } from "lucide-react";
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { AuthLayoutSkeleton } from "./AuthLayoutSkeleton";
-import { Button } from "./ui/button";
 import { NotificationProvider } from "./NotificationProvider";
 import { useNotifications } from "./NotificationProvider";
 import { NotificationBell } from "./NotificationBell";
+import { ModeToggle } from "./ModeToggle";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarInset,
+  useSidebar,
+} from "./ui/sidebar";
 
 type MenuItem = {
   icon: typeof ShieldCheck;
@@ -32,10 +43,9 @@ type MenuItem = {
 };
 
 const menuItems: MenuItem[] = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: ServerCog, label: "Servers & Configs", path: "/servers" },
-  { icon: DatabaseBackup, label: "Quản lý Job", path: "/jobs" },
-  { icon: History, label: "Backup History", path: "/history" },
+  { icon: LayoutDashboard, label: "Trang chủ", path: "/" },
+  { icon: DatabaseBackup, label: "Quản lý", path: "/jobs" },
+  { icon: ServerCog, label: "Cấu hình", path: "/projects" },
   {
     icon: ShieldCheck,
     label: "Phân quyền",
@@ -46,37 +56,37 @@ const menuItems: MenuItem[] = [
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   const { isLoading, user } = useAuth();
+  const navigate = useNavigate();
 
-  if (isLoading) return <AuthLayoutSkeleton />;
+  useEffect(() => {
+    if (!user) navigate(LOGIN_PATH, { replace: true });
+  }, [user, navigate]);
 
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex w-full max-w-md flex-col items-center gap-8 p-8">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-center text-2xl font-black uppercase tracking-tight">
-              Đăng nhập để tiếp tục
-            </h1>
-            <p className="max-w-sm text-center text-sm text-[var(--text-muted)]">
-              Khu vực quản trị hệ thống backup yêu cầu xác thực tài khoản.
-            </p>
-          </div>
-          <Button
-            onClick={() => { window.location.href = LOGIN_PATH; }}
-            size="lg"
-            className="w-full shadow-lg transition-all hover:shadow-xl"
-          >
-            Đăng nhập
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading || !user) return <AuthLayoutSkeleton />;
 
   return (
     <NotificationProvider>
-      <AuthLayoutInner>{children}</AuthLayoutInner>
+      <SidebarProvider>
+        <AuthLayoutInner>{children}</AuthLayoutInner>
+      </SidebarProvider>
     </NotificationProvider>
+  );
+}
+
+function SidebarToggleButon() {
+  const { state, toggleSidebar } = useSidebar();
+
+  return (
+    <SidebarMenuButton
+      onClick={toggleSidebar}
+      tooltip={state === "collapsed" ? "Mở rộng" : "Thu gọn"}
+      className="text-[12px] font-bold uppercase tracking-[0.12em] text-[var(--sidebar-foreground)]"
+    >
+      <PanelLeftClose className="h-4 w-4" />
+      <span className="group-data-[collapsible=icon]:hidden">
+        {state === "collapsed" ? "Menu" : "Thu gọn"}
+      </span>
+    </SidebarMenuButton>
   );
 }
 
@@ -93,37 +103,17 @@ function AuthLayoutInner({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* ── Top Navbar ── */}
-      <header className="sticky top-0 z-50 flex h-14 items-center border-b border-[var(--panel-mid)] bg-[var(--panel-dark)]/95 px-5 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
+    <div className="flex min-h-svh w-full flex-col">
+      {/* ── Full-width Top Navbar ── */}
+      <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center border-b border-[var(--panel-mid)] bg-[var(--panel-dark)]/95 px-5 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
         {/* Brand */}
-        <span className="mr-8 text-[11px] font-black uppercase tracking-[0.25em] text-[var(--panel-light)]">
+        <span className="text-[11px] font-black uppercase tracking-[0.25em] text-[var(--panel-light)]">
           Backup Manager
         </span>
 
-        {/* Navigation links */}
-        <nav className="flex items-center gap-1">
-          {visibleItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-colors ${
-                  isActive
-                    ? "bg-white text-[var(--panel-dark)]"
-                    : "text-[var(--text-muted)] hover:bg-[var(--panel-mid)]/50 hover:text-white"
-                }`}
-              >
-                <item.icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
         {/* Spacer + Notification + User */}
         <div className="ml-auto flex items-center gap-1">
+          <ModeToggle />
           <NotificationBell />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -151,10 +141,52 @@ function AuthLayoutInner({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      {/* ── Page Content ── */}
-      <main className="flex-1 p-5 lg:p-8">
-        <div className="mx-auto w-full max-w-[1400px]">{children}</div>
-      </main>
+      {/* ── Body: Sidebar + Content ── */}
+      <div className="flex min-h-0 flex-1 w-full overflow-hidden">
+        <Sidebar collapsible="icon" className="top-14 h-[calc(100vh-3.5rem)]">
+          <SidebarContent className="pt-6">
+            <SidebarMenu>
+              {visibleItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.label}
+                      onClick={() => navigate(item.path)}
+                      className={`text-[12px] font-bold uppercase tracking-[0.12em] ${
+                        isActive ? "text-[var(--sidebar-accent-foreground)]" : ""
+                      }`}
+                    >
+                      <button>
+                        <item.icon className="h-4 w-4" />
+                        <span className="group-data-[collapsible=icon]:hidden">
+                          {item.label}
+                        </span>
+                      </button>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarContent>
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarToggleButon />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+        </Sidebar>
+
+        <SidebarInset>
+          {/* ── Page Content ── */}
+          <main className="flex-1 p-5 lg:p-8">
+            <div className="mx-auto w-full max-w-[1400px]">{children}</div>
+          </main>
+        </SidebarInset>
+      </div>
     </div>
   );
 }

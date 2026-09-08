@@ -48,7 +48,7 @@ export default function Login() {
             type="button"
             onClick={login}
             disabled={pending || !keycloakConfigured}
-            className="flex w-full items-center justify-center gap-2 border border-white bg-white py-2.5 text-[11px] font-black uppercase tracking-[0.25em] text-[var(--panel-dark)] transition-all hover:bg-transparent hover:text-white disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 border border-[var(--foreground)] bg-[var(--foreground)] py-2.5 text-[11px] font-black uppercase tracking-[0.25em] text-[var(--background)] transition-all hover:bg-transparent hover:text-[var(--foreground)] disabled:opacity-50"
           >
             {pending ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

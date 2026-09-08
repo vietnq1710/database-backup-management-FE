@@ -72,7 +72,7 @@ export function NotificationBell() {
                     </div>
                     <button
                       onClick={() => dismiss(n.id)}
-                      className="mt-0.5 shrink-0 text-[var(--text-muted)] opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
+                      className="mt-0.5 shrink-0 text-[var(--text-muted)] opacity-0 transition-opacity hover:text-[var(--foreground)] group-hover:opacity-100"
                       aria-label="Dismiss"
                     >
                       <X className="h-3 w-3" />

@@ -1,6 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -16,6 +13,8 @@
     --accent-green: #4CC38A;
     --accent-red: #E05C5C;
     --accent-yellow: #E6AF2E;
+    --panel-mid-40: color-mix(in srgb, var(--panel-mid) 40%, transparent);
+    --panel-mid-20: color-mix(in srgb, var(--panel-mid) 20%, transparent);
 
     --background: 222 80% 20%;
     --foreground: 0 0% 100%;
@@ -52,36 +51,84 @@
     color-scheme: dark;
   }
 
+  .light {
+    --panel-dark: #EEF2F5;
+    --panel-mid: #A6B3C0;
+    --panel-light: #23384B;
+    --text-muted: #48617A;
+    --accent-blue: #2563A8;
+    --accent-green: #1F8A57;
+    --accent-red: #C23B3B;
+    --accent-yellow: #A87914;
+
+    --background: 210 20% 94%;
+    --foreground: 222 55% 8%;
+    --card: 210 20% 94%;
+    --card-foreground: 222 55% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 55% 8%;
+    --primary: 222 55% 8%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 88%;
+    --secondary-foreground: 222 55% 8%;
+    --muted: 210 20% 88%;
+    --muted-foreground: 215 30% 38%;
+    --accent: 207 75% 42%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 46%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 20% 60%;
+    --input: 214 20% 60%;
+    --ring: 207 75% 42%;
+    --radius: 0px;
+
+    --sidebar-background: 210 20% 94%;
+    --sidebar-foreground: 215 30% 28%;
+    --sidebar-primary: 207 75% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 87%;
+    --sidebar-accent-foreground: 222 55% 8%;
+    --sidebar-border: 214 20% 60%;
+    --sidebar-ring: 207 75% 42%;
+
+    color-scheme: light;
+  }
+
   * { @apply border-border; }
 
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: var(--panel-dark);
-    color: #fff;
+    color: var(--foreground);
     -webkit-font-smoothing: antialiased;
   }
+}
 
+@layer base {
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: var(--panel-dark); }
   ::-webkit-scrollbar-thumb { background: var(--panel-mid); border: 2px solid var(--panel-dark); }
   ::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
 
-  /* Dropdown native (select) nền tối, chữ sáng — không còn popup trắng chói */
   select option,
   select optgroup {
-    background-color: #0b1c29;
-    color: #dcebf5;
+    background-color: var(--popover);
+    color: var(--popover-foreground);
   }
   select option:checked,
   select option:hover {
     background-color: var(--panel-mid);
-    color: #fff;
+    color: var(--foreground);
   }
 }
 
 @layer components {
-  .panel {
+  .dark .panel {
     background: color-mix(in srgb, var(--panel-dark) 82%, black);
+    border: 1px solid var(--panel-mid);
+  }
+  .light .panel {
+    background: var(--panel-dark);
     border: 1px solid var(--panel-mid);
   }
   .panel-label {
@@ -92,7 +139,7 @@
     color: var(--text-muted);
   }
   .mono-nums {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
     font-variant-numeric: tabular-nums;
   }
 }

@@ -56,7 +56,7 @@ export default function AuthCallback() {
             <button
               type="button"
               onClick={() => navigate("/login", { replace: true })}
-              className="border border-white bg-white px-4 py-2 text-[11px] font-black uppercase tracking-[0.25em] text-[var(--panel-dark)] transition-all hover:bg-transparent hover:text-white"
+              className="border border-[var(--foreground)] bg-[var(--foreground)] px-4 py-2 text-[11px] font-black uppercase tracking-[0.25em] text-[var(--background)] transition-all hover:bg-transparent hover:text-[var(--foreground)]"
             >
               Về trang đăng nhập
             </button>
