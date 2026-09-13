@@ -33,6 +33,8 @@ dist-ssr
 db/migrations/*.sql
 # TypeScript cache
 *.tsbuildinfo
+# Project progress notes (local only)
+PROGRESS.md
 # Build outputs
 dist/
 build/
