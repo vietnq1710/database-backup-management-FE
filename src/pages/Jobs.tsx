@@ -1,4 +1,4 @@
-import { Fragment, useState, type FormEvent } from "react";
+import { Fragment, useMemo, useState, type FormEvent } from "react";
 import AuthLayout from "@/components/AuthLayout";
 import { PageHeader, StatusBadge, TableStateRow, ViewToggle } from "@/components/common";
 import { Pagination } from "@/components/Pagination";
@@ -7,11 +7,13 @@ import {
   useCreateBackupJob,
   useCreateSyncJob,
   useDatabaseConfigs,
+  useMyPermissionsView,
   useProjects,
   useRemoveJob,
   useSyncJobsPage,
   useToggleJob,
   useUpdateBackupJob,
+  useUsers,
 } from "@/api/hooks";
 import { cronLabel, formatDateTime, shortId, totalPagesOf } from "@/lib/format";
 import { CRON_PRESETS } from "@/lib/cron-presets";
@@ -23,12 +25,13 @@ import {
   Pencil,
   Play,
   RefreshCcw,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "react-router";
-import type { BackupJob, DatabaseConfig } from "@/types/api";
+import type { BackupJob, DatabaseConfig, ManagedUser } from "@/types/api";
 import { useNotifications } from "@/components/NotificationProvider";
 import { JobHistoryDialog } from "@/components/JobHistoryDialog";
 
@@ -38,6 +41,11 @@ const selectCls = inputCls + " appearance-none";
 
 const submitBtnCls =
   "flex w-full items-center justify-center gap-2 border border-[var(--foreground)] bg-[var(--foreground)] py-2.5 text-[11px] font-black uppercase tracking-[0.25em] text-[var(--background)] transition-all hover:bg-transparent hover:text-[var(--foreground)] disabled:opacity-50";
+
+function userLabel(u?: ManagedUser): string {
+  if (!u) return "";
+  return u.fullname ?? u.username ?? u.email ?? shortId(u.id);
+}
 
 function DialogHeader({
   title,
@@ -496,7 +504,8 @@ function JobsContent() {
   } | null>(null);
   const [historyJob, setHistoryJob] = useState<BackupJob | null>(null);
   const [detailJob, setDetailJob] = useState<BackupJob | null>(null);
-  const [backupView, setBackupView] = useState<"table" | "grid">("table");
+  const [backupView, setBackupView] = useState<"table" | "grid">("grid");
+  const [backupSearch, setBackupSearch] = useState("");
   const [backupPage, setBackupPage] = useState(1);
   const [backupLimit, setBackupLimit] = useState(20);
   const backups = useBackupJobsPage({ page: backupPage, limit: backupLimit });
@@ -505,9 +514,26 @@ function JobsContent() {
   const syncs = useSyncJobsPage({ page: syncPage, limit: syncLimit });
   const configs = useDatabaseConfigs();
   const projects = useProjects();
+  const users = useUsers();
+  const view = useMyPermissionsView();
   // join databaseConfigId -> config để hiện tên database thay vì id
   const configById = new Map((configs.data ?? []).map((c) => [c.id, c]));
   const projectById = new Map((projects.data ?? []).map((p) => [p.id, p.name]));
+  // triggeredBy bên BE có thể là _id, ssoId, username, email hay fullname
+  const findUserByTrigger = useMemo(() => {
+    const list = users.data ?? [];
+    return (triggeredBy: string) =>
+      list.find(
+        (u) =>
+          u.id === triggeredBy ||
+          u.ssoId === triggeredBy ||
+          u.username === triggeredBy ||
+          u.email === triggeredBy ||
+          u.fullname === triggeredBy,
+      );
+  }, [users.data]);
+  // Chỉ admin / user có quyền "quản lý phân quyền" được xem ai đã tạo job
+  const showTriggeredBy = view.canManage;
 
   const jobProjectName = (job: BackupJob): string => {
     const cfg = configById.get(job.databaseConfigId);
@@ -518,6 +544,19 @@ function JobsContent() {
     const cfg = configById.get(job.databaseConfigId);
     return cfg?.projectId ?? "other";
   };
+
+  const filteredBackupJobs = (backups.data?.result ?? []).filter((it) => {
+    const q = backupSearch.trim().toLowerCase();
+    if (!q) return true;
+    const cfg = configById.get(it.job.databaseConfigId);
+    return (
+      jobProjectName(it.job).toLowerCase().includes(q) ||
+      (cfg?.configCode ?? "").toLowerCase().includes(q) ||
+      (cfg?.databaseName ?? "").toLowerCase().includes(q) ||
+      (cfg?.host ?? "").toLowerCase().includes(q) ||
+      it.job.databaseConfigId.toLowerCase().includes(q)
+    );
+  });
 
   const toggle = useToggleJob();
   const remove = useRemoveJob();
@@ -557,18 +596,18 @@ function JobsContent() {
     );
   };
 
-  const thCls = "px-4 py-2.5 text-left text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)] whitespace-nowrap";
-  const tdCls = "px-4 py-2.5 align-middle";
+  const thCls = "px-5 py-2.5 text-left text-[10px] font-black uppercase tracking-[0.18em] text-[var(--text-muted)] whitespace-nowrap";
+  const tdCls = "px-5 py-2.5 align-middle";
 
   return (
     <>
       <PageHeader title="Quản lý Job" />
 
-      <div className="flex border-b border-[var(--panel-mid)]">
+      <div className="flex items-center border-b border-[var(--panel-mid)]">
           {(
             [
-              { key: "backup", label: "Backup Jobs", icon: DatabaseBackup, count: backups.data?.total },
-              { key: "sync", label: "Sync Jobs", icon: RefreshCcw, count: syncs.data?.total },
+              { key: "backup", label: "Backup Jobs", icon: DatabaseBackup },
+              { key: "sync", label: "Sync Jobs", icon: RefreshCcw },
             ] as const
           ).map((t) => (
             <button
@@ -582,13 +621,14 @@ function JobsContent() {
             >
               <t.icon className="h-3.5 w-3.5" />
               {t.label}
-              {t.count !== undefined && (
-                <span className="mono-nums border border-[var(--panel-mid)] px-1.5 text-[10px]">
-                  {t.count}
-                </span>
-              )}
             </button>
           ))}
+          <span className="ml-auto px-5 text-sm font-semibold text-[var(--text-muted)]">
+            <span className="text-[var(--foreground)]">
+              {(tab === "backup" ? backups.data?.total : syncs.data?.total) ?? 0}
+            </span>{" "}
+            {tab === "backup" ? "backup job được cấp quyền" : "sync job được cấp quyền"}
+          </span>
       </div>
 
       <div className="flex items-center justify-between gap-2 px-5 py-3">
@@ -596,19 +636,33 @@ function JobsContent() {
           {tab === "backup" && <ViewToggle value={backupView} onChange={setBackupView} />}
           <button
             onClick={() => setDialog({ kind: tab })}
-            className="flex items-center gap-2 border border-[var(--accent-blue)] bg-[var(--accent-blue)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-colors hover:brightness-110"
+            className="flex items-center gap-2 border border-[var(--accent-blue)] bg-[var(--accent-blue)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all hover:brightness-110 hover:scale-105"
           >
             {tab === "backup" ? "Backup Job" : "Sync Job"}
           </button>
         </div>
       </div>
 
+      {tab === "backup" && (
+        <div className="flex justify-end px-5">
+          <div className="relative w-[13.25rem]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input
+              value={backupSearch}
+              onChange={(e) => setBackupSearch(e.target.value)}
+              placeholder="Tìm theo project / config..."
+              className="w-full border border-[var(--panel-mid)] bg-black/[0.015] py-1.5 pl-8 pr-3 text-xs outline-none transition-colors focus:border-[var(--accent-blue)] placeholder:text-[var(--text-muted)]"
+            />
+          </div>
+        </div>
+      )}
+
       {tab === "backup" ? (
           backupView === "grid" ? (
             <>
             <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
               {(() => {
-                const jobs = backups.data?.result ?? [];
+                const jobs = filteredBackupJobs;
                 const groups = new Map<string, { name: string; jobs: typeof jobs }>();
                 for (const it of jobs) {
                   const key = jobProjectKey(it.job);
@@ -631,7 +685,7 @@ function JobsContent() {
                   <div
                     key={job.id}
                     onClick={() => setDetailJob(job)}
-                    className="flex min-h-44 cursor-pointer flex-col justify-between gap-3 border border-[var(--panel-mid)] bg-[var(--panel-dark)] p-5 transition-all duration-200 hover:z-10 hover:scale-[1.2] hover:border-[var(--accent-blue)]"
+                    className="flex min-h-44 cursor-pointer flex-col justify-between gap-3 border border-[var(--panel-mid)] bg-[var(--panel-dark)] p-5 transition-all duration-200 hover:z-10 hover:scale-[1.135] hover:border-[var(--accent-blue)]"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <StatusBadge status={job.isActive ? "active" : "paused"} />
@@ -721,11 +775,13 @@ function JobsContent() {
                     </Fragment>
                   ));
               })()}
-              {(backups.isLoading || (backups.data?.total ?? 0) === 0) && (
+              {(backups.isLoading || (backups.data?.total ?? 0) === 0 || filteredBackupJobs.length === 0) && (
                 <div className="col-span-full px-5 py-10 text-center text-sm text-[var(--text-muted)]">
                   {backups.isLoading
                     ? "Đang tải dữ liệu..."
-                    : 'Chưa có backup job nào — bấm "Backup Job" để tạo (hoặc bạn chưa được cấp quyền xem database nào)'}
+                    : (backups.data?.total ?? 0) > 0
+                      ? "Không tìm thấy backup job nào khớp từ khóa"
+                      : 'Chưa có backup job nào — bấm "Backup Job" để tạo (hoặc bạn chưa được cấp quyền xem database nào)'}
                 </div>
               )}
             </div>
@@ -758,7 +814,7 @@ function JobsContent() {
               </thead>
               <tbody>
                 {(() => {
-                  const jobs = backups.data?.result ?? [];
+                  const jobs = filteredBackupJobs;
                   const groups = new Map<string, { name: string; jobs: typeof jobs }>();
                   for (const it of jobs) {
                     const key = jobProjectKey(it.job);
@@ -865,11 +921,15 @@ function JobsContent() {
                         </Fragment>
                       ));
                 })()}
-                {(backups.isLoading || (backups.data?.total ?? 0) === 0) && (
+                {(backups.isLoading || (backups.data?.total ?? 0) === 0 || filteredBackupJobs.length === 0) && (
                   <TableStateRow
                     colSpan={7}
                     loading={backups.isLoading}
-                    empty={'Chưa có backup job nào — bấm "Backup Job" để tạo (hoặc bạn chưa được cấp quyền xem database nào)'}
+                    empty={
+                      (backups.data?.total ?? 0) > 0
+                        ? "Không tìm thấy backup job nào khớp từ khóa"
+                        : 'Chưa có backup job nào — bấm "Backup Job" để tạo (hoặc bạn chưa được cấp quyền xem database nào)'
+                    }
                   />
                 )}
               </tbody>
@@ -898,8 +958,8 @@ function JobsContent() {
                   <th className={thCls}>Project nguồn</th>
                   <th className={thCls}>Nguồn → Đích</th>
                   <th className={thCls}>Trạng thái</th>
+                  {showTriggeredBy && <th className={thCls}>Người tạo</th>}
                   <th className={thCls}>Cập nhật</th>
-                  <th className={thCls}></th>
                 </tr>
               </thead>
               <tbody>
@@ -934,27 +994,22 @@ function JobsContent() {
                       <td className={tdCls}>
                         <StatusBadge status={job.status} />
                       </td>
+                      {showTriggeredBy && (
+                        <td className={tdCls + " text-xs whitespace-nowrap"} title={job.triggeredBy ?? undefined}>
+                          {job.triggeredBy
+                            ? (userLabel(findUserByTrigger(job.triggeredBy)) || job.triggeredBy)
+                            : "—"}
+                        </td>
+                      )}
                       <td className={tdCls + " mono-nums text-xs"}>
                         {formatDateTime(job.updatedAt)}
-                      </td>
-                      <td className={tdCls}>
-                        <div className="flex gap-1.5">
-                          <ActionButton
-                            title="Xóa"
-                            danger
-                            disabled={busy}
-                            onClick={() => onRemove("sync", job.id, shortId(job.id))}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </ActionButton>
-                        </div>
                       </td>
                     </tr>
                   );
                 })}
                 {(syncs.isLoading || (syncs.data?.total ?? 0) === 0) && (
                   <TableStateRow
-                    colSpan={6}
+                    colSpan={5 + (showTriggeredBy ? 1 : 0)}
                     loading={syncs.isLoading}
                     empty={'Chưa có sync job nào — bấm "Sync Job" để tạo (hoặc bạn chưa được cấp quyền xem database nào)'}
                   />

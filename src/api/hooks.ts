@@ -948,6 +948,7 @@ const KEYSNotifications = {
 export function useCompletionNotifications(
   addNotification: (text: string) => void,
 ) {
+  const qc = useQueryClient();
   const seenSyncRef = useRef(new Map<string, string>());
   const seenBackupRef = useRef(new Map<string, string>());
   const initSyncRef = useRef(false);
@@ -979,6 +980,7 @@ export function useCompletionNotifications(
       return;
     }
 
+    let didComplete = false;
     for (const j of jobs) {
       if (!j.id || !j.status) continue;
       const isCompleted = j.status === "SUCCESS" || j.status === "FAILED";
@@ -990,6 +992,7 @@ export function useCompletionNotifications(
       const wasCompleted = old === "SUCCESS" || old === "FAILED";
       if (old === undefined || !wasCompleted) {
         const label = syncLabel(j);
+        didComplete = true;
         if (j.status === "SUCCESS") {
           toast.success(`Sync hoàn thành: ${label}`);
           addNotification(`Sync hoàn thành: ${label}`);
@@ -1000,7 +1003,10 @@ export function useCompletionNotifications(
       }
       seen.set(j.id, j.status);
     }
-  }, [syncs.data, addNotification]);
+    // Có job sync vừa hoàn thành → làm mới query sync (cả many lẫn page)
+    // để bảng Quản lý Job cập nhật trạng thái real-time
+    if (didComplete) qc.invalidateQueries({ queryKey: KEYS.syncJobs });
+  }, [syncs.data, addNotification, qc]);
 
   // ── Backup completions ──
   useEffect(() => {
