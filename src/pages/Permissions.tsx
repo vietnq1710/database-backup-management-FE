@@ -517,7 +517,7 @@ function AdminPermissions() {
         right={
           <button
             onClick={() => setDialog({ kind: "create" })}
-            className="flex items-center gap-2 border border-[var(--foreground)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] transition-colors hover:bg-[var(--foreground)] hover:text-[var(--background)]"
+            className="flex items-center gap-2 border border-[var(--accent-blue)] bg-[var(--accent-blue)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all hover:brightness-110 hover:scale-105"
           >
             <Plus className="h-3.5 w-3.5" />
             Gán quyền

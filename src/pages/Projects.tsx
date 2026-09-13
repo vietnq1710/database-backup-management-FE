@@ -190,7 +190,7 @@ function ProjectsContent() {
   const [projPage, setProjPage] = useState(1);
   const [projLimit, setProjLimit] = useState(20);
   const projectsPage = useProjectsPage({ page: projPage, limit: projLimit });
-  const configsPage = useDatabaseConfigsPage({ page: 1, limit: 20 });
+  const configsPage = useDatabaseConfigsPage({ page: 1, limit: 1 });
 
   const filteredProjects = (projectsPage.data?.result ?? []).filter((p) =>
     p.name.toLowerCase().includes(projSearch.trim().toLowerCase()),
@@ -211,20 +211,18 @@ function ProjectsContent() {
     <>
       <PageHeader title="Cấu hình" />
 
-      <div className="flex border-b border-[var(--panel-mid)]">
+      <div className="flex items-center border-b border-[var(--panel-mid)]">
         {(
           [
             {
               key: "projects",
               label: "Projects",
               icon: ServerCog,
-              count: projectsPage.data?.total ?? 0,
             },
             {
               key: "configs",
               label: "Database Configs",
               icon: Database,
-              count: configsPage.data?.total ?? 0,
             },
           ] as const
         ).map((t) => (
@@ -240,11 +238,16 @@ function ProjectsContent() {
           >
             <t.icon className="h-4 w-4" />
             {t.label}
-            <span className="mono-nums border border-[var(--panel-mid)] px-1.5 text-[10px]">
-              {t.count}
-            </span>
           </button>
         ))}
+        <span className="ml-auto px-5 text-sm font-semibold text-[var(--text-muted)]">
+          <span className="text-[var(--foreground)]">
+            {tab === "projects"
+              ? (projectsPage.data?.total ?? 0)
+              : (configsPage.data?.total ?? 0)}
+          </span>{" "}
+          {tab === "projects" ? "project được cấp quyền" : "config được cấp quyền"}
+        </span>
       </div>
 
       {tab === "projects" ? (
@@ -254,21 +257,21 @@ function ProjectsContent() {
               <ViewToggle value={projectView} onChange={setProjectView} />
               <button
                 onClick={() => setProjectDialog({ kind: "create" })}
-                className="flex items-center gap-2 border border-[var(--accent-blue)] bg-[var(--accent-blue)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-colors hover:brightness-110"
+                className="flex items-center gap-2 border border-[var(--accent-blue)] bg-[var(--accent-blue)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all hover:brightness-110 hover:scale-105"
               >
                 Thêm Project
               </button>
             </div>
           </div>
 
-          <div className="flex justify-end px-5 pb-4">
+          <div className="flex justify-end px-5">
             <div className="relative w-[13.25rem]">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--text-muted)]" />
               <input
                 value={projSearch}
                 onChange={(e) => setProjSearch(e.target.value)}
                 placeholder="Tìm kiếm project..."
-                className="w-full border border-[var(--panel-mid)] bg-black/5 py-1.5 pl-8 pr-3 text-xs outline-none transition-colors focus:border-[var(--accent-blue)] placeholder:text-[var(--text-muted)]"
+                className="w-full border border-[var(--panel-mid)] bg-black/[0.015] py-1.5 pl-8 pr-3 text-xs outline-none transition-colors focus:border-[var(--accent-blue)] placeholder:text-[var(--text-muted)]"
               />
             </div>
           </div>

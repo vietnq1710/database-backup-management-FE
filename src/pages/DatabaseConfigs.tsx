@@ -118,31 +118,19 @@ function EnvBadge({ env }: { env: string | null | undefined }) {
   if (!env) return <span className="text-[10px] text-[var(--text-muted)]">—</span>;
   const color =
     env === "PRODUCTION"
-      ? "border-[var(--accent-red)] text-[var(--accent-red)]"
+      ? "dark:text-black bg-[var(--accent-red)] text-white"
       : env === "STAGING"
-        ? "border-amber-400 text-amber-400"
+        ? "dark:text-black bg-amber-400 text-white"
         : env === "UAT"
-          ? "border-purple-400 text-purple-400"
-          : "border-[var(--accent-blue)] text-[var(--accent-blue)]";
+          ? "dark:text-black bg-amber-400 text-white"
+          : "dark:text-black bg-[var(--accent-blue)] text-white";
   return (
     <span
       className={
-        "inline-flex items-center gap-1.5 border px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] " +
+        "inline-flex items-center px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] " +
         color
       }
     >
-      {env === "PRODUCTION" && (
-        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-red)]" />
-      )}
-      {env === "STAGING" && (
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-      )}
-      {env === "UAT" && (
-        <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
-      )}
-      {env === "DEVELOPMENT" && (
-        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-blue)]" />
-      )}
       {env}
     </span>
   );
@@ -660,21 +648,21 @@ function DatabaseConfigsContent({
           <ViewToggle value={configView} onChange={setConfigView} />
           <button
             onClick={onAddConfig}
-            className="flex items-center gap-2 border border-[var(--accent-blue)] bg-[var(--accent-blue)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-colors hover:brightness-110"
+            className="flex items-center gap-2 border border-[var(--accent-blue)] bg-[var(--accent-blue)] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white transition-all hover:brightness-110 hover:scale-105"
           >
             Thêm Config
           </button>
         </div>
       </div>
 
-      <div className="flex justify-end px-5 pb-4">
+      <div className="flex justify-end px-5">
         <div className="relative w-[12.75rem]">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             value={configSearch}
             onChange={(e) => setConfigSearch(e.target.value)}
             placeholder="Tìm kiếm config..."
-            className="w-full border border-[var(--panel-mid)] bg-black/5 py-1.5 pl-8 pr-3 text-xs outline-none transition-colors focus:border-[var(--accent-blue)] placeholder:text-[var(--text-muted)]"
+            className="w-full border border-[var(--panel-mid)] bg-black/[0.015] py-1.5 pl-8 pr-3 text-xs outline-none transition-colors focus:border-[var(--accent-blue)] placeholder:text-[var(--text-muted)]"
           />
         </div>
       </div>

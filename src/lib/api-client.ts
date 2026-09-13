@@ -43,6 +43,7 @@ async function execute(path: string, opts: RequestOptions): Promise<Response> {
   }
 
   const headers: Record<string, string> = {};
+  headers["Accept-Language"] = "vi";
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
   const token = getAccessToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -90,6 +91,7 @@ export async function requestFile(
   const doFetch = (): Promise<Response> => {
     const url = new URL(`${API_BASE}${path}`, window.location.origin);
     const headers: Record<string, string> = {};
+    headers["Accept-Language"] = "vi";
     const token = getAccessToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
     return fetch(url.toString(), { headers });

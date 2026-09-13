@@ -406,7 +406,7 @@ function DatabaseInspector() {
         </div>
 
         {/* snapshot tables */}
-        <div className="max-h-[70vh] overflow-y-auto">
+        <div className="max-h-[100vh] overflow-y-auto">
           <div className="panel-label sticky top-0 z-10 flex items-center justify-between bg-[var(--panel-dark)] px-4 py-3">
             <span>
               Tables{" "}
@@ -560,7 +560,7 @@ function DashboardContent() {
   return (
     <>
       <PageHeader
-        title="Dashboard"
+        title="Trang chủ"
       />
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">

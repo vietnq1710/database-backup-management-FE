@@ -5,10 +5,10 @@
 @layer base {
   :root {
     /* Calm-space theme tokens (blue) */
-    --panel-dark: #0F2535;
-    --panel-mid: #1F4A65;
+    --panel-dark: #1C3D55;
+    --panel-mid: #2A5A78;
     --panel-light: #A7C9DE;
-    --text-muted: #6B87A0;
+    --text-muted: #8FA8BC;
     --accent-blue: #4C9BE0;
     --accent-green: #4CC38A;
     --accent-red: #E05C5C;
@@ -16,35 +16,35 @@
     --panel-mid-40: color-mix(in srgb, var(--panel-mid) 40%, transparent);
     --panel-mid-20: color-mix(in srgb, var(--panel-mid) 20%, transparent);
 
-    --background: 222 80% 20%;
+    --background: 222 60% 25%;
     --foreground: 0 0% 100%;
-    --card: 222 80% 20%;
+    --card: 222 60% 25%;
     --card-foreground: 0 0% 100%;
-    --popover: 210 55% 12%;
+    --popover: 210 48% 17%;
     --popover-foreground: 0 0% 100%;
     --primary: 0 0% 100%;
-    --primary-foreground: 222 80% 20%;
-    --secondary: 222 60% 25%;
+    --primary-foreground: 222 60% 25%;
+    --secondary: 222 50% 32%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 222 60% 25%;
-    --muted-foreground: 222 50% 60%;
+    --muted: 222 50% 32%;
+    --muted-foreground: 222 40% 70%;
     --accent: 207 70% 59%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 210 52% 26%;
-    --input: 210 52% 26%;
+    --border: 210 40% 35%;
+    --input: 210 40% 35%;
     --ring: 207 70% 59%;
     --radius: 0px;
 
     /* shadcn sidebar tokens mapped to calm-space palette */
-    --sidebar-background: 210 55% 11%;
-    --sidebar-foreground: 204 38% 82%;
+    --sidebar-background: 210 48% 17%;
+    --sidebar-foreground: 204 38% 86%;
     --sidebar-primary: 207 70% 59%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 52% 18%;
+    --sidebar-accent: 210 42% 24%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 210 52% 20%;
+    --sidebar-border: 210 40% 30%;
     --sidebar-ring: 207 70% 59%;
 
     /* Native controls (select popup, scrollbar, date picker...) theo theme tối */
@@ -97,7 +97,7 @@
   * { @apply border-border; }
 
   body {
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: var(--panel-dark);
     color: var(--foreground);
     -webkit-font-smoothing: antialiased;
